@@ -13,6 +13,7 @@ import { INDEX_HTML } from './web.js';
 import { PtyManager } from './pty-manager.js';
 import { registerTerminal } from './terminal.js';
 import { registerGovernance } from './governance.js';
+import { registerExtensions } from './extensions.js';
 
 const pExecFile = promisify(execFile);
 
@@ -53,6 +54,14 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
   const ptys = deps.ptyManager ?? new PtyManager(audit);
   registerTerminal(app, ptys);
   registerGovernance(app, audit);
+  registerExtensions(app, audit, {
+    utilization: async () => {
+      // rough estimate: sessions in current 5h window vs a soft operating budget
+      const sessions = await ls({ limit: 500 });
+      const est = estimateUsage(sessions.map((s) => ({ lastModified: s.lastModified, fileSize: s.fileSize ?? 0 })), Date.now());
+      return Math.min(1, est.currentWindow.sessions / 50);
+    },
+  });
   app.addHook('onClose', async () => ptys.killAll());
 
   app.get('/', async (_req, reply) => reply.type('text/html').send(INDEX_HTML));
