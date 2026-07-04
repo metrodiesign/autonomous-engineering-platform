@@ -1,0 +1,27 @@
+name: ci
+on:
+  push:
+    branches: [main, develop, 'build/**']
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run ci
+      - name: golden manifest integrity
+        run: |
+          if [ -f test/golden/_MANIFEST.sha256 ]; then
+            (cd test/golden && shasum -a 256 -c _MANIFEST.sha256)
+          else
+            echo "no golden manifest yet (pre-freeze)"
+          fi

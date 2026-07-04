@@ -1,0 +1,7 @@
+packages:
+  # adapters + console/* join in their phases (§14)
+  - core
+  - aal
+allowBuilds:
+  better-sqlite3: true
+  node-pty: true
