@@ -4,3 +4,4 @@ export * from './conformance.js';
 export * from './bridge.js';
 export * from './breaker.js';
 export * from './router.js';
+export * from './fusion.js';

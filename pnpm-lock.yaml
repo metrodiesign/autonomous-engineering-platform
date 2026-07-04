@@ -47,6 +47,9 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: 0.3.200
         version: 0.3.200(@anthropic-ai/sdk@0.110.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(zod@4.4.3)
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../../core
       '@xterm/xterm':
         specifier: 6.0.0
         version: 6.0.0

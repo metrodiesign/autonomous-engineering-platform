@@ -1,0 +1,14 @@
+{
+  "date": "2026-07-05",
+  "model": "haiku",
+  "panel": 2,
+  "task": "FUS-rom",
+  "singleRunPass": true,
+  "fusionPass": true,
+  "upliftObserved": false,
+  "costMultiplier": 2,
+  "dissent": [
+    "panel#1: also-passing alternative"
+  ],
+  "policyNote": "fusion default OFF — enable per policy only where calibration proves uplift (§7.5); n=1 here, evidence not a rate"
+}

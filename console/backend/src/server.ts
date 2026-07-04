@@ -14,6 +14,8 @@ import { PtyManager } from './pty-manager.js';
 import { registerTerminal } from './terminal.js';
 import { registerGovernance } from './governance.js';
 import { registerExtensions } from './extensions.js';
+import { registerLoopConsole } from './loop-console.js';
+import { BasicAuthProvider } from './auth-provider.js';
 
 const pExecFile = promisify(execFile);
 
@@ -51,16 +53,59 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
   const auditFile = deps.auditFile ?? join('.ai', 'audit', 'console.jsonl');
   mkdirSync(dirname(auditFile), { recursive: true });
   const audit = (e: Record<string, unknown>) => appendFileSync(auditFile, JSON.stringify(e) + '\n');
+
+  // host-header validation (§13.3): block DNS-rebinding — allow loopback names + explicit extra host
+  const extraHost = env.PLATFORM_CONSOLE_HOST;
+  app.addHook('onRequest', async (req, reply) => {
+    const host = (req.headers.host ?? '').replace(/:\d+$/, '');
+    const allowed = ['127.0.0.1', 'localhost', '::1', '[::1]', ...(extraHost ? [extraHost] : [])];
+    if (host && !allowed.includes(host)) {
+      return reply.code(403).send({ error: 'host not allowed' });
+    }
+  });
+
+  // ---- remote auth (§13, Phase 3): Basic provider active when operator configured it ----
+  const passwordRecord = env.PLATFORM_CONSOLE_PASSWORD_RECORD;
+  const signingSecret = env.PLATFORM_CONSOLE_SIGNING_SECRET;
+  const provider = passwordRecord && signingSecret
+    ? new BasicAuthProvider({ passwordRecord, signingSecret, sessionTtlMs: 12 * 3_600_000 })
+    : null;
+  if (provider) {
+    app.post<{ Body: { password?: string } }>('/api/auth/login', async (req, reply) => {
+      const r = provider.login(req.body?.password ?? '');
+      audit({ type: 'AUTH_LOGIN', ok: r.ok, ip: req.ip, ts: Date.now() }); // §13.3: auth events audited
+      if (!r.ok) return reply.code(r.error === 'rate_limited' ? 429 : 401).send({ error: 'unauthorized' }); // generic
+      reply.header('set-cookie', `session=${r.token}; HttpOnly; SameSite=Lax; Path=/`);
+      return { ok: true, token: r.token };
+    });
+    app.addHook('preHandler', async (req, reply) => {
+      if (req.url === '/api/auth/login') return;
+      const cookieToken = /(?:^|;\s*)session=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
+      const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (!provider.verify(cookieToken ?? bearer)) {
+        return reply.code(401).send({ error: 'unauthorized' });
+      }
+    });
+  }
+
   const ptys = deps.ptyManager ?? new PtyManager(audit);
   registerTerminal(app, ptys);
   registerGovernance(app, audit);
-  registerExtensions(app, audit, {
-    utilization: async () => {
-      // rough estimate: sessions in current 5h window vs a soft operating budget
-      const sessions = await ls({ limit: 500 });
-      const est = estimateUsage(sessions.map((s) => ({ lastModified: s.lastModified, fileSize: s.fileSize ?? 0 })), Date.now());
-      return Math.min(1, est.currentWindow.sessions / 50);
+  const utilization = async () => {
+    // rough estimate: sessions in current 5h window vs a soft operating budget
+    const sessions = await ls({ limit: 500 });
+    const est = estimateUsage(sessions.map((s) => ({ lastModified: s.lastModified, fileSize: s.fileSize ?? 0 })), Date.now());
+    return Math.min(1, est.currentWindow.sessions / 50);
+  };
+  registerExtensions(app, audit, { utilization });
+  registerLoopConsole(app, {
+    humanPlaneUrl: env.PLATFORM_HUMAN_PLANE_URL ?? 'http://127.0.0.1:9210',
+    tokenFile: env.PLATFORM_HUMAN_PLANE_TOKEN_FILE ?? '.ai/human-plane.token',
+    automationGuard: async () => {
+      const u = await utilization();
+      return { allowed: u < 0.85, utilization: u };
     },
+    audit,
   });
   app.addHook('onClose', async () => ptys.killAll());
 

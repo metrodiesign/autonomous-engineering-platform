@@ -13,3 +13,5 @@ export * from './repair.js';
 export * from './merge-policy.js';
 export * from './steering.js';
 export * from './security-plane.js';
+export * from './auditor.js';
+export * from './merge-queue.js';
