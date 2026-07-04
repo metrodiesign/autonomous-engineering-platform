@@ -8,6 +8,16 @@ import { PtyManager } from './pty-manager.js';
 
 const require_ = createRequire(import.meta.url);
 
+/** JSON safe for inline <script> interpolation — blocks </script> breakout (XSS) */
+function safeJsonForScript(v: unknown): string {
+  return JSON.stringify(v)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 export function registerTerminal(app: FastifyInstance, ptys: PtyManager): void {
   // single-use WS tickets (§13.3)
   const tickets = new Map<string, { termId: string; expires: number }>();
@@ -48,7 +58,7 @@ export function registerTerminal(app: FastifyInstance, ptys: PtyManager): void {
   app.get<{ Querystring: { project?: string; resume?: string } }>('/terminal', async (req, reply) => {
     const xtermJs = readFileSync(require_.resolve('@xterm/xterm/lib/xterm.js'), 'utf8');
     const xtermCss = readFileSync(require_.resolve('@xterm/xterm/css/xterm.css'), 'utf8');
-    const boot = JSON.stringify({ project: req.query.project ?? process.cwd(), resume: req.query.resume ?? null });
+    const boot = safeJsonForScript({ project: req.query.project ?? process.cwd(), resume: req.query.resume ?? null });
     reply.type('text/html').send(TERMINAL_HTML(xtermJs, xtermCss, boot));
   });
 
