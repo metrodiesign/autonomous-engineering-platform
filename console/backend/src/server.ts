@@ -12,6 +12,7 @@ import { estimateUsage, type SessionStat } from './usage.js';
 import { INDEX_HTML } from './web.js';
 import { PtyManager } from './pty-manager.js';
 import { registerTerminal } from './terminal.js';
+import { registerGovernance } from './governance.js';
 
 const pExecFile = promisify(execFile);
 
@@ -51,6 +52,7 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
   const audit = (e: Record<string, unknown>) => appendFileSync(auditFile, JSON.stringify(e) + '\n');
   const ptys = deps.ptyManager ?? new PtyManager(audit);
   registerTerminal(app, ptys);
+  registerGovernance(app, audit);
   app.addHook('onClose', async () => ptys.killAll());
 
   app.get('/', async (_req, reply) => reply.type('text/html').send(INDEX_HTML));
