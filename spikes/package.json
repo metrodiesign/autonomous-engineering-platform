@@ -1,0 +1,18 @@
+{
+  "name": "spikes",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Pre-Phase-1 verification spikes per unified-platform-spec.md §15. Throwaway after gates pass (DECISIONS D-006).",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.201",
+    "@xterm/xterm": "6.0.0",
+    "node-pty": "1.1.0",
+    "ws": "8.19.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "node-pty"
+    ]
+  }
+}
