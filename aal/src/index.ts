@@ -5,3 +5,4 @@ export * from './bridge.js';
 export * from './breaker.js';
 export * from './router.js';
 export * from './fusion.js';
+export * from './shadow-routing.js';

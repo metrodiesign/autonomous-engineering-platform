@@ -15,3 +15,5 @@ export * from './steering.js';
 export * from './security-plane.js';
 export * from './auditor.js';
 export * from './merge-queue.js';
+export * from './planning-gate.js';
+export * from './lessons.js';
