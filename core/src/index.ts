@@ -7,3 +7,4 @@ export * from './gates.js';
 export * from './golden.js';
 export * from './state-machine.js';
 export * from './orchestrator.js';
+export * from './context-builder.js';
