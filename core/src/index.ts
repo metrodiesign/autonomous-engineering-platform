@@ -1,3 +1,9 @@
 // Ring 0 — deterministic core (§6). Vendor-neutral by INV-7 (CI-enforced).
-// Populated in Phase 0: executor, event log, lease, state machine, gates, golden harness.
-export {};
+export * from './types.js';
+export * from './event-log.js';
+export * from './policy.js';
+export * from './executor.js';
+export * from './gates.js';
+export * from './golden.js';
+export * from './state-machine.js';
+export * from './orchestrator.js';
