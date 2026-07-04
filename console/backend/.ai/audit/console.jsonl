@@ -1,0 +1,6 @@
+{"type":"PTY_SPAWN","termId":"term-14c5ade960","cwd":"/Users/king_developer/Desktop/Project/autonomous-engineering-platform","mode":"claude-only","ts":1783183672841}
+{"type":"PTY_ATTACH","termId":"term-14c5ade960","ts":1783183672849}
+{"type":"PTY_DETACH","termId":"term-14c5ade960","ts":1783183704881}
+{"type":"PTY_ATTACH","termId":"term-14c5ade960","ts":1783183710555}
+{"type":"PTY_DETACH","termId":"term-14c5ade960","ts":1783183744575}
+{"type":"PTY_KILL","termId":"term-14c5ade960","ts":1783183751324}

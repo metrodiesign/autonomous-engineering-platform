@@ -2,14 +2,16 @@
 // Reads Claude Code state live (INV-11 — no shadow copies). Every UI capability is a REST endpoint.
 import Fastify, { type FastifyInstance } from 'fastify';
 import { execFile } from 'node:child_process';
-import { readdirSync, existsSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { listSessions, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import { detectAuth } from './auth.js';
 import { estimateUsage, type SessionStat } from './usage.js';
 import { INDEX_HTML } from './web.js';
+import { PtyManager } from './pty-manager.js';
+import { registerTerminal } from './terminal.js';
 
 const pExecFile = promisify(execFile);
 
@@ -19,6 +21,8 @@ export interface ServerDeps {
   listSessions?: typeof listSessions;
   getSessionMessages?: typeof getSessionMessages;
   cliVersion?: () => Promise<string>;
+  auditFile?: string;
+  ptyManager?: PtyManager;
 }
 
 const DISCLAIMER = 'Third-party operator console for Claude Code — not an Anthropic product.';
@@ -40,6 +44,14 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
     });
 
   const app = Fastify({ logger: false });
+
+  // audit log (JSON lines, redacted by construction — no payload bodies) per §13.3
+  const auditFile = deps.auditFile ?? join('.ai', 'audit', 'console.jsonl');
+  mkdirSync(dirname(auditFile), { recursive: true });
+  const audit = (e: Record<string, unknown>) => appendFileSync(auditFile, JSON.stringify(e) + '\n');
+  const ptys = deps.ptyManager ?? new PtyManager(audit);
+  registerTerminal(app, ptys);
+  app.addHook('onClose', async () => ptys.killAll());
 
   app.get('/', async (_req, reply) => reply.type('text/html').send(INDEX_HTML));
 
