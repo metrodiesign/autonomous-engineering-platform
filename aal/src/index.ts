@@ -2,3 +2,5 @@
 export * from './protocol.js';
 export * from './conformance.js';
 export * from './bridge.js';
+export * from './breaker.js';
+export * from './router.js';
