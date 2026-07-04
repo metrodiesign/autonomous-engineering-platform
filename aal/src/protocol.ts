@@ -38,7 +38,12 @@ export interface AgentResponse {
   actionRequests: Action[];
   usage: AgentUsage;
   rawTranscriptRef: string;
-  adapterMeta: { adapterId: string; modelVersion: string };
+  adapterMeta: {
+    adapterId: string;
+    modelVersion: string;
+    /** tool definitions observed on the wire at session init — deterministic P6 evidence */
+    observedTools?: number;
+  };
 }
 
 export interface CapabilityManifest {

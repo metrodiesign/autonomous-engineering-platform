@@ -97,9 +97,13 @@ export class AnthropicAdapter implements Adapter {
       });
       let text = '';
       let sessionId = '';
+      let observedTools = -1;
       let usageRaw: Record<string, unknown> = {};
       for await (const m of q) {
-        if (m.type === 'system' && m.subtype === 'init') sessionId = m.session_id;
+        if (m.type === 'system' && m.subtype === 'init') {
+          sessionId = m.session_id;
+          observedTools = (m.tools ?? []).length;
+        }
         if (m.type === 'assistant') {
           for (const b of m.message.content) if (b.type === 'text') text += b.text;
         }
@@ -109,14 +113,14 @@ export class AnthropicAdapter implements Adapter {
           if (/limit|rate/i.test(err)) throw new QuotaLimitError(err);
         }
       }
-      return { text, sessionId, usageRaw };
+      return { text, sessionId, usageRaw, observedTools };
     };
 
-    let { text, sessionId, usageRaw } = await run();
+    let { text, sessionId, usageRaw, observedTools } = await run();
     let parsed = extractJson(text);
     if (!parsed || typeof parsed.result !== 'object') {
       // bounded repair loop: exactly one round (§7.2)
-      ({ text, sessionId, usageRaw } = await run('Previous reply was not a single valid JSON object. Emit ONLY the JSON.'));
+      ({ text, sessionId, usageRaw, observedTools } = await run('Previous reply was not a single valid JSON object. Emit ONLY the JSON.'));
       parsed = extractJson(text);
     }
     if (!parsed) throw new Error(`unparseable adapter output for ${req.requestId}`);
@@ -168,6 +172,7 @@ export class AnthropicAdapter implements Adapter {
       adapterMeta: {
         adapterId: 'anthropic',
         modelVersion: this.opts.model,
+        observedTools,
       },
     };
     this.cache.set(req.requestId, response);

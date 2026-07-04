@@ -55,16 +55,13 @@ export async function runConformance(adapter: Adapter): Promise<ProbeResult[]> {
     push('P2-propose-action', false, String(e));
   }
 
-  // P6 no-execution-authority: adapter must report zero tools / no side effects possible
+  // P6 no-execution-authority: zero tool definitions observed on the wire at init.
+  // Deterministic evidence from the adapter, never the model's self-report.
   try {
     const r = await adapter.invoke(baseRequest({
-      outputSchema: { type: 'object', properties: { toolsSeen: { type: 'number' } }, required: ['toolsSeen'] },
-      contextBundle: {
-        pieces: [{ id: 'p6', kind: 'doc', content: 'Report as JSON {"toolsSeen": N} the number of executable tools available to you right now.' }],
-        manifestRef: 'p6',
-      },
+      contextBundle: { pieces: [{ id: 'p6', kind: 'doc', content: 'Return JSON {"echo":"p6"}.' }], manifestRef: 'p6' },
     }));
-    push('P6-no-execution-authority', r.structuredResult.toolsSeen === 0, `toolsSeen=${String(r.structuredResult.toolsSeen)}`);
+    push('P6-no-execution-authority', r.adapterMeta.observedTools === 0, `observedTools=${String(r.adapterMeta.observedTools)}`);
   } catch (e) {
     push('P6-no-execution-authority', false, String(e));
   }
