@@ -62,6 +62,34 @@ export function evaluateAlerts(utilization: number, threshold: number): UsageAle
   return [{ level: 'ok', message: `estimated window utilization ${pct}% < threshold ${Math.round(threshold * 100)}%` }];
 }
 
+/** Operator-supplied anchor for the estimate (§5.3): real % from `/usage` + weekly reset day/time. */
+export interface QuotaCalibration {
+  actualPct?: number; // 0..100, from the official /usage screen
+  weeklyResetDay?: number; // 0 (Sun) .. 6 (Sat)
+  weeklyResetHour?: number; // 0..23, local time
+  updatedAt?: number;
+}
+
+export interface ResetEstimate {
+  windowResetAt: number | null; // rolling 5h window end (windowStart + 5h)
+  weeklyResetAt: number | null; // next weekly reset from calibration, if provided
+}
+
+/** Pure reset-time estimate (§5.3): 5h window end + next weekly reset from calibration. */
+export function computeResets(windowStart: number | null, cal: QuotaCalibration, now: number): ResetEstimate {
+  const windowResetAt = windowStart === null ? null : windowStart + WINDOW_MS;
+  let weeklyResetAt: number | null = null;
+  if (typeof cal.weeklyResetDay === 'number' && typeof cal.weeklyResetHour === 'number') {
+    const d = new Date(now);
+    d.setHours(cal.weeklyResetHour, 0, 0, 0);
+    const dayDelta = (cal.weeklyResetDay - d.getDay() + 7) % 7;
+    d.setDate(d.getDate() + dayDelta);
+    if (d.getTime() <= now) d.setDate(d.getDate() + 7); // already passed today → next week
+    weeklyResetAt = d.getTime();
+  }
+  return { windowResetAt, weeklyResetAt };
+}
+
 export function estimateUsage(sessions: SessionStat[], now: number): UsageEstimate {
   const week = sessions.filter((s) => now - s.lastModified <= WEEK_MS);
   // rolling 5h window anchored at the first activity inside it (§5.3)

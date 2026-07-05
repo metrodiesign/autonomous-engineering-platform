@@ -27,6 +27,54 @@ const baseRequest = (over: Partial<AgentRequest> = {}): AgentRequest => ({
   ...over,
 });
 
+/** stored baseline for the drift canary (§7.3) — the pass/fail of each probe when the adapter registered. */
+export interface DriftBaseline {
+  probes: { probe: string; pass: boolean }[];
+}
+
+export interface DriftReport {
+  drifted: boolean;
+  /** probes whose current pass/fail differs from baseline */
+  changes: { probe: string; baseline: boolean; current: boolean }[];
+  current: ProbeResult[];
+}
+
+/**
+ * Drift canary (§7.3): re-run a cheap conformance subset — P1 structured output + P6 isolation —
+ * and report any regression vs a stored baseline. Cheap enough to run on a schedule; the learning
+ * plane freezes when this trips (§10.4).
+ */
+export async function driftCheck(adapter: Adapter, baseline: DriftBaseline): Promise<DriftReport> {
+  const current: ProbeResult[] = [];
+
+  try {
+    const r = await adapter.invoke(baseRequest({
+      contextBundle: { pieces: [{ id: 'd1', kind: 'doc', content: 'Return JSON {"echo":"pong"} exactly.' }], manifestRef: 'd1' },
+    }));
+    current.push({ probe: 'P1-echo-schema', pass: typeof r.structuredResult.echo === 'string', detail: JSON.stringify(r.structuredResult).slice(0, 120) });
+  } catch (e) {
+    current.push({ probe: 'P1-echo-schema', pass: false, detail: String(e) });
+  }
+
+  try {
+    const r = await adapter.invoke(baseRequest({
+      contextBundle: { pieces: [{ id: 'd6', kind: 'doc', content: 'Return JSON {"echo":"d6"}.' }], manifestRef: 'd6' },
+    }));
+    current.push({ probe: 'P6-no-execution-authority', pass: r.adapterMeta.observedTools === 0, detail: `observedTools=${String(r.adapterMeta.observedTools)}` });
+  } catch (e) {
+    current.push({ probe: 'P6-no-execution-authority', pass: false, detail: String(e) });
+  }
+
+  const baseByName = new Map(baseline.probes.map((p) => [p.probe, p.pass]));
+  const changes = current.flatMap((c) => {
+    const base = baseByName.get(c.probe);
+    return base !== undefined && base !== c.pass
+      ? [{ probe: c.probe, baseline: base, current: c.pass }]
+      : [];
+  });
+  return { drifted: changes.length > 0, changes, current };
+}
+
 export async function runConformance(adapter: Adapter): Promise<ProbeResult[]> {
   const results: ProbeResult[] = [];
   const push = (probe: string, pass: boolean, detail: string) => results.push({ probe, pass, detail });

@@ -1,0 +1,55 @@
+# models.yaml.example (§7.4 / §14) — role -> capability profile, NOT hardcoded model ids in core.
+# INV-8: core routes by capability profile only; concrete vendor model ids live here (an operator-edited
+# example), never in core/. Copy to .ai/models.yaml and adjust to the adapters you have registered.
+# `default_preference` is a starting point; the router overrides it with calibration numbers (§12).
+version: 1
+capability_profiles:
+  reasoning_large_context:
+    reasoning: true
+    large_context: true
+    structured_output: true
+  code_structured:
+    code_proposal: true
+    structured_output: true
+  code_proposal:
+    code_proposal: true
+roles:
+  - role: planner
+    requires:
+      reasoning: true
+      large_context: true
+    fusion: always
+    default_preference:
+      - adapter: anthropic
+        model: claude-opus
+  - role: test_designer
+    requires:
+      code_proposal: true
+    different_lineage_from: implementer
+    default_preference:
+      - adapter: openai-compatible
+        model: glm-5.2
+  - role: implementer
+    requires:
+      code_proposal: true
+      structured_output: true
+    default_preference:
+      - adapter: codex
+        model: codex
+  - role: reviewer
+    requires:
+      reasoning: true
+      large_context: true
+    ensemble: true
+    default_preference:
+      - adapter: anthropic
+        model: claude-opus
+      - adapter: openai-compatible
+        model: glm-5.2
+  - role: diagnostician
+    requires:
+      reasoning: true
+      large_context: true
+    default_preference:
+      - adapter: anthropic
+        model: claude-opus

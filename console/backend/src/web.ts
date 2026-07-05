@@ -375,15 +375,24 @@ pages.status = async (root) => {
       '<div class="kpi" style="font-size:16px;margin-top:4px">' + usage.week.sessions + '<small>sessions / week</small></div>' +
       '<div class="muted" style="margin-top:6px">' + esc(usage.officialSource) + '</div></div>' +
       '<div class="card"><h2>Active terminals</h2><div class="kpi">' + term.terminals.length + '<small>PTY</small></div>' +
-      '<div class="muted" style="margin-top:6px">autonomous runs appear in Loop Console</div></div>' +
+      '<div class="muted" style="margin-top:6px">interactive runs (mode: both surfaces below)</div></div>' +
+      (function () { var a = (st.runs && st.runs.autonomous) || { running: false };
+        return '<div class="card"><h2>Autonomous loop</h2>' +
+          (a.running
+            ? '<div class="kpi">' + (a.pendingApprovals || 0) + '<small>pending approvals</small></div>' +
+              '<div class="muted" style="margin-top:6px">last event #' + (a.lastEventSeq || 0) + ' · <a href="#/loop">Loop Console →</a></div>'
+            : '<div class="kpi" style="font-size:16px">not running</div><div class="muted" style="margin-top:6px">' + esc(a.reason || 'no loop') + '</div>') +
+          '</div>'; })() +
       '</div>' +
-      '<div class="card"><h2>Active runs</h2>' +
+      '<div class="card"><h2>Active runs (interactive)</h2>' +
       (term.terminals.length
         ? '<table><tr><th>ID</th><th>Directory</th><th></th></tr>' + term.terminals.map((t) =>
             '<tr><td><code>' + esc(t.id) + '</code></td><td class="muted">' + esc(t.cwd) + '</td>' +
             '<td><a target="_blank" href="/terminal?attach=' + esc(t.id) + '">attach →</a></td></tr>').join('') + '</table>'
         : empty('No interactive terminals', 'Spawn one from the Terminal page or the ⌨ button above')) +
-      '</div>';
+      '</div>' +
+      '<div class="card"><h2>Doctor (brief)</h2><pre>' + esc(st.doctorBrief || 'loading… (cached 60s)') + '</pre>' +
+      '<div class="muted">Full doctor + host stats on the System page.</div></div>';
   };
   root.innerHTML = '<div class="card">' + skeleton(4) + '</div>';
   await render();
@@ -500,7 +509,10 @@ pages.sessions = async (root) => {
 // ---- F-Term ----
 pages.terminal = async (root) => {
   const { terminals } = await api('/api/term');
+  const usage = await api('/api/usage').catch(() => null); // INV-13: quota HUD, fail-open
   root.innerHTML =
+    (usage ? '<div class="banner ' + (usage.currentWindow.sessions >= 40 ? 'yellow' : 'green') + '"><b>Quota estimate</b> ~' +
+      usage.currentWindow.sessions + ' sessions in the 5h window · ' + esc(usage.officialSource) + '</div>' : '') +
     '<div class="card"><h2>New terminal</h2>' +
     '<div class="row"><button class="primary" id="spawn">⌨ Spawn claude</button>' +
     '<span class="muted">real CLI via PTY (100% parity) · cwd = ' + esc(getProject() || 'server cwd') + '</span></div>' +
@@ -644,24 +656,58 @@ pages.memory = async (root) => {
   await load();
 };
 
-// ---- F-MCP ----
+// ---- F-MCP (3 layers: user / project / managed-ro) ----
 pages.mcp = async (root) => {
   const r = await api('/api/mcp' + dirQ());
-  const servers = r.mcpServers ?? {};
-  const names = Object.keys(servers);
+  const disabled = new Set(r.disabled || []);
+  const layer = (title, l) => {
+    if (!l) return '';
+    const names = Object.keys(l.servers || {});
+    return '<div class="card"><h2>' + esc(title) + ' <span class="pill">' + names.length + '</span> <span class="muted">' + esc(l.path) + (l.readOnly ? ' · read-only' : '') + '</span></h2>' +
+      (names.length ? '<table><tr><th>Server</th><th>Type</th><th style="text-align:right">Actions</th></tr>' + names.map((n) => {
+        const s = l.servers[n] || {};
+        const type = s.command ? 'stdio' : (s.url ? 'http' : '?');
+        const off = disabled.has(n);
+        return '<tr><td><code>' + esc(n) + '</code>' + (off ? ' <span class="pill">disabled</span>' : '') + '</td>' +
+          '<td class="muted">' + esc(type) + '</td><td style="text-align:right;white-space:nowrap">' +
+          (s.command ? '<button class="ghost" data-test="' + esc(n) + '">test</button>' : '') +
+          (l.readOnly ? '' : '<button class="ghost" data-toggle="' + esc(n) + '" data-off="' + (off ? '0' : '1') + '">' + (off ? 'enable' : 'disable') + '</button>') +
+          '</td></tr>';
+      }).join('') + '</table>' : empty('none')) + '</div>';
+  };
   root.innerHTML =
-    '<div class="card"><h2>MCP servers <span class="pill">' + names.length + '</span> <span class="muted">.mcp.json · project scope</span></h2>' +
-    (names.length ? '<pre>' + esc(JSON.stringify(servers, null, 2)) + '</pre>' : empty('No MCP servers configured')) + '</div>' +
-    '<div class="card"><h2>Add server</h2>' +
+    layer('User (~/.claude.json)', r.user) +
+    layer('Project (.mcp.json)', r.project) +
+    (r.managed ? layer('Managed (admin, read-only)', r.managed) : '') +
+    '<div id="testout"></div>' +
+    '<div class="card"><h2>Add server <span class="muted">project .mcp.json</span></h2>' +
     '<div class="row"><input type="text" id="name" aria-label="name" placeholder="name" style="width:180px"></div>' +
     '<textarea id="def" aria-label="server definition JSON" placeholder="{&quot;command&quot;:&quot;npx&quot;,&quot;args&quot;:[&quot;-y&quot;,&quot;some-mcp&quot;]} or {&quot;url&quot;:&quot;https://...&quot;}"></textarea>' +
     '<div class="row"><button class="primary" id="add">Add</button>' +
-    '<span class="muted">Takes effect on next session start.</span></div></div>';
+    '<span class="muted">Test is a stdio start-check (spawns the command 5s) — not a full handshake. Takes effect next session start.</span></div></div>';
   $('#add').onclick = async () => {
     try {
       await api('/api/mcp' + dirQ(), { method: 'PUT', body: { name: $('#name').value, server: JSON.parse($('#def').value) } });
       savedToast('New sessions will see this server.'); route();
     } catch (e) { fail(e); }
+  };
+  root.onclick = async (ev) => {
+    const t = ev.target.closest('[data-test]');
+    const tg = ev.target.closest('[data-toggle]');
+    if (t) {
+      if (!(await confirmDialog('Run start-check?', 'This spawns the "' + t.dataset.test + '" command from .mcp.json on THIS host (start-check, not a full handshake).', { action: 'Run' }))) return;
+      try {
+        $('#testout').innerHTML = '<div class="banner">testing ' + esc(t.dataset.test) + '… (up to 5s)</div>';
+        const res = await api('/api/mcp/test' + dirQ(), { method: 'POST', body: { name: t.dataset.test, consent: true } });
+        const cls = res.ok === true ? 'green' : (res.ok === false ? 'red' : 'yellow');
+        $('#testout').innerHTML = '<div class="banner ' + cls + '"><b>' + esc(t.dataset.test) + ' · ' + esc(res.check) + '</b> ' + esc(res.note) + '</div>';
+      } catch (e) { fail(e); }
+      return;
+    }
+    if (tg) {
+      try { await api('/api/mcp/disable', { method: 'POST', body: { name: tg.dataset.toggle, disabled: tg.dataset.off === '1' } });
+        savedToast('Applies to new sessions.'); route(); } catch (e) { fail(e); }
+    }
   };
 };
 
@@ -669,27 +715,44 @@ pages.mcp = async (root) => {
 pages.hooks = async (root) => {
   const r = await api('/api/hooks' + dirQ());
   const scopes = Object.entries(r.scopes).filter(([, v]) => v.hooks && Object.keys(v.hooks).length);
+  const disabledScopes = Object.entries(r.scopes).filter(([, v]) => v.disableAllHooks);
+  const types = r.handlerTypes || ['command'];
   root.innerHTML =
     '<div class="card"><h2>Configured hooks</h2>' +
     (scopes.length ? scopes.map(([k, v]) =>
       '<div class="row"><span class="pill">' + esc(k) + '</span></div><pre>' + esc(JSON.stringify(v.hooks, null, 2)) + '</pre>').join('')
       : empty('No hooks configured in any scope')) +
+    (disabledScopes.length ? '<div class="banner yellow"><b>disableAllHooks</b> is ON in: ' + esc(disabledScopes.map(([k]) => k).join(', ')) + '</div>' : '') +
     '<div class="muted">The TUI /hooks menu is read-only — this page is the editor.</div></div>' +
     '<div class="card"><h2>Add hook</h2>' +
     '<div class="row"><label>Scope</label><select id="scope" aria-label="scope"><option>project</option><option>user</option><option>local</option></select>' +
-    '<label>Event</label><select id="event" aria-label="hook event">' + r.events.map((e) => '<option>' + esc(e) + '</option>').join('') + '</select></div>' +
+    '<label>Event</label><select id="event" aria-label="hook event">' + r.events.map((e) => '<option>' + esc(e) + '</option>').join('') + '</select>' +
+    '<label>Type</label><select id="htype" aria-label="handler type">' + types.map((t) => '<option>' + esc(t) + '</option>').join('') + '</select></div>' +
     '<div class="row"><input type="text" id="matcher" aria-label="hook matcher" placeholder="matcher (optional, e.g. Bash)" style="width:220px">' +
-    '<input type="text" id="cmd" aria-label="hook command" placeholder="command" style="flex:1;min-width:220px"></div>' +
-    '<div class="row"><label style="font-weight:400"><input type="checkbox" id="consent"> I understand this command runs on my machine on every matching event</label></div>' +
-    '<div class="row"><button class="primary" id="add">Add hook</button><span class="muted">Applies to new sessions.</span></div></div>';
+    '<input type="text" id="cmd" aria-label="hook command" placeholder="command (required for type=command)" style="flex:1;min-width:220px"></div>' +
+    '<div class="row"><label style="font-weight:400"><input type="checkbox" id="consent"> I understand this runs on my machine on every matching event</label></div>' +
+    '<div class="row"><button class="primary" id="add">Add hook</button><span class="muted">Applies to new sessions.</span></div></div>' +
+    '<div class="card"><h2>Master switch <span class="muted">disableAllHooks</span></h2>' +
+    '<div class="row"><label>Scope</label><select id="dscope" aria-label="disable scope"><option>project</option><option>user</option><option>local</option></select>' +
+    '<label style="font-weight:400"><input type="checkbox" id="dconsent"> I understand this can silence security hooks</label></div>' +
+    '<div class="row"><button class="danger" id="disableAll">Disable all hooks</button><button id="enableAll">Re-enable</button>' +
+    '<span class="muted">Turns every hook in that scope off/on.</span></div></div>';
   $('#add').onclick = async () => {
     try {
-      const body = { event: $('#event').value, command: $('#cmd').value, consent: $('#consent').checked };
+      const body = { event: $('#event').value, type: $('#htype').value, command: $('#cmd').value, consent: $('#consent').checked };
       if ($('#matcher').value) body.matcher = $('#matcher').value;
       await api('/api/hooks/' + $('#scope').value + dirQ(), { method: 'PUT', body });
       savedToast(); route();
     } catch (e) { fail(e); }
   };
+  const setDisableAll = async (val) => {
+    try {
+      await api('/api/hooks/' + $('#dscope').value + '/disable-all' + dirQ(), { method: 'PUT', body: { disableAllHooks: val, consent: $('#dconsent').checked } });
+      savedToast(); route();
+    } catch (e) { fail(e); }
+  };
+  $('#disableAll').onclick = () => setDisableAll(true);
+  $('#enableAll').onclick = () => setDisableAll(false);
 };
 
 // ---- F-Sub ----
@@ -697,8 +760,13 @@ pages.subagents = async (root) => {
   const r = await api('/api/subagents' + dirQ());
   root.innerHTML =
     '<div class="card"><h2>Subagents <span class="pill">' + r.subagents.length + '</span> <span class="muted">' + esc(r.dir) + '</span></h2>' +
-    (r.subagents.length ? r.subagents.map((s) => '<div class="row"><span class="pill">' + esc(s.file) + '</span></div><pre>' + esc(s.content) + '</pre>').join('')
-      : empty('No subagents yet', 'Create one below — it becomes a Markdown file with frontmatter')) + '</div>' +
+    (r.subagents.length ? r.subagents.map((s) => {
+      const name = s.file.replace(/\\.md$/, '');
+      return '<div class="row"><span class="pill">' + esc(s.file) + '</span>' +
+        '<button class="ghost" data-test="' + esc(name) + '">test-run (dry)</button>' +
+        '<button class="ghost danger" data-del="' + esc(name) + '">delete</button></div><pre>' + esc(s.content) + '</pre>';
+    }).join('') : empty('No subagents yet', 'Create one below — it becomes a Markdown file with frontmatter')) +
+    '<div id="subout"></div></div>' +
     '<div class="card"><h2>Create subagent</h2>' +
     '<div class="row"><input type="text" id="name" aria-label="name" placeholder="kebab-case-name" style="width:220px">' +
     '<input type="text" id="desc" aria-label="description" placeholder="description" style="flex:1;min-width:220px"></div>' +
@@ -710,6 +778,22 @@ pages.subagents = async (root) => {
       savedToast('Available to new sessions.'); route();
     } catch (e) { fail(e); }
   };
+  root.onclick = async (ev) => {
+    const t = ev.target.closest('[data-test]');
+    const d = ev.target.closest('[data-del]');
+    if (t) {
+      try {
+        const res = await api('/api/subagents/' + t.dataset.test + '/test-run' + dirQ(), { method: 'POST' });
+        $('#subout').innerHTML = '<div class="banner ' + (res.wouldLoad ? 'green' : 'yellow') + '"><b>' + esc(t.dataset.test) +
+          (res.wouldLoad ? ' would load' : ' issues') + '</b> ' + esc(res.note) + (res.issues.length ? ' — ' + esc(res.issues.join('; ')) : '') + '</div>';
+      } catch (e) { fail(e); }
+      return;
+    }
+    if (d) {
+      if (!(await confirmDialog('Delete subagent?', d.dataset.del + '.md is removed from disk.', { danger: true, action: 'Delete' }))) return;
+      try { await api('/api/subagents/' + d.dataset.del + dirQ(), { method: 'DELETE' }); toast('Deleted', 'green'); route(); } catch (e) { fail(e); }
+    }
+  };
 };
 
 // ---- F-Skill ----
@@ -718,12 +802,39 @@ pages.skills = async (root) => {
   const list = (xs) => xs.length
     ? xs.map((x) => '<span class="pill" style="margin:2px 4px 2px 0">' + esc(x) + '</span>').join('')
     : empty('none');
+  const plugins = r.plugins || {};
+  const pnames = Object.keys(plugins);
   root.innerHTML =
     '<div class="grid2">' +
     '<div class="card"><h2>User skills <span class="muted">~/.claude/skills</span></h2>' + list(r.user) + '</div>' +
     '<div class="card"><h2>Project skills <span class="muted">.claude/skills</span></h2>' + list(r.project) + '</div>' +
     '</div>' +
-    '<div class="card"><h2>Plugins</h2><div class="muted">Manage via <code>enabledPlugins</code> in Settings; the marketplace lives in the CLI.</div></div>';
+    '<div class="card"><h2>Plugins <span class="muted">enabledPlugins · user settings</span></h2>' +
+    (pnames.length ? '<table><tr><th>Plugin</th><th>State</th><th style="text-align:right"></th></tr>' + pnames.map((n) => {
+      const on = !!plugins[n];
+      return '<tr><td><code>' + esc(n) + '</code></td><td>' +
+        (on ? '<span class="pill green"><span class="dot"></span>enabled</span>' : '<span class="pill">disabled</span>') + '</td>' +
+        '<td style="text-align:right"><button class="ghost" data-plug="' + esc(n) + '" data-en="' + (on ? '0' : '1') + '">' + (on ? 'disable' : 'enable') + '</button></td></tr>';
+    }).join('') + '</table>' : empty('No plugins configured')) +
+    '<div class="row" style="margin-top:8px"><input type="text" id="pname" aria-label="plugin name" placeholder="name@marketplace" style="flex:1;max-width:320px">' +
+    '<label style="font-weight:400"><input type="checkbox" id="pconsent"> consent (runs third-party code)</label>' +
+    '<button class="primary" id="paddon">Enable plugin</button></div>' +
+    '<div class="muted">Enabling a plugin runs third-party code — consent required. The marketplace lives in the CLI.</div></div>';
+  root.onclick = async (ev) => {
+    const b = ev.target.closest('[data-plug]'); if (!b) return;
+    const enable = b.dataset.en === '1';
+    if (enable && !(await confirmDialog('Enable plugin?', b.dataset.plug + ' will run third-party code in your sessions.', { action: 'Enable' }))) return;
+    try {
+      await api('/api/skills/plugins', { method: 'PUT', body: enable ? { name: b.dataset.plug, enabled: true, consent: true } : { name: b.dataset.plug, enabled: false } });
+      savedToast('Applies to new sessions.'); route();
+    } catch (e) { fail(e); }
+  };
+  $('#paddon').onclick = async () => {
+    try {
+      await api('/api/skills/plugins', { method: 'PUT', body: { name: $('#pname').value, enabled: true, consent: $('#pconsent').checked } });
+      savedToast('Applies to new sessions.'); route();
+    } catch (e) { fail(e); }
+  };
 };
 
 // ---- F-Usage ----
@@ -741,13 +852,24 @@ pages.usage = async (root) => {
     return '<table>' + rows.map((r) => '<tr><td style="width:55%">' + esc(r[k]) + bar(r.sessions, max) + '</td>' +
       '<td style="text-align:right;font-weight:600">' + r.sessions + '</td></tr>').join('') + '</table>';
   };
+  const reset = u.resetEstimate || {};
+  const cal = u.calibration || {};
+  const fmtReset = (t) => t ? new Date(t).toLocaleString() : '—';
   root.innerHTML =
     '<div class="grid2">' +
-    '<div class="card"><h2>5h window</h2><div class="kpi">' + u.currentWindow.sessions + '<small>sessions</small></div></div>' +
-    '<div class="card"><h2>Week</h2><div class="kpi">' + u.week.sessions + '<small>sessions</small></div></div>' +
+    '<div class="card"><h2>5h window</h2><div class="kpi">' + u.currentWindow.sessions + '<small>sessions</small></div>' +
+    '<div class="muted" style="margin-top:6px">resets ~' + esc(fmtReset(reset.windowResetAt)) + '</div></div>' +
+    '<div class="card"><h2>Week</h2><div class="kpi">' + u.week.sessions + '<small>sessions</small></div>' +
+    '<div class="muted" style="margin-top:6px">weekly reset ~' + esc(fmtReset(reset.weeklyResetAt)) + (cal.actualPct != null ? ' · calibrated ' + esc(cal.actualPct) + '%' : '') + '</div></div>' +
     '</div>' +
     '<div class="muted" style="margin:-6px 0 12px">' + esc(u.label) + ' · ' + esc(u.officialSource) + '</div>' +
     alerts.alerts.map((a) => '<div class="banner ' + (a.level === 'warn' ? 'yellow' : 'green') + '">' + esc(a.message) + '</div>').join('') +
+    '<div class="card"><h2>Calibration <span class="muted">anchor the estimate with real numbers from /usage</span></h2>' +
+    '<div class="row"><label>actual %</label><input type="number" id="calPct" min="0" max="100" value="' + esc(cal.actualPct != null ? cal.actualPct : '') + '" placeholder="from /usage" style="width:110px">' +
+    '<label>weekly reset day</label><input type="number" id="calDay" min="0" max="6" value="' + esc(cal.weeklyResetDay != null ? cal.weeklyResetDay : '') + '" placeholder="0=Sun" style="width:90px">' +
+    '<label>hour</label><input type="number" id="calHour" min="0" max="23" value="' + esc(cal.weeklyResetHour != null ? cal.weeklyResetHour : '') + '" placeholder="0-23" style="width:80px">' +
+    '<button class="primary" id="calSave">Save calibration</button></div>' +
+    '<div class="muted">No official quota API exists — these anchor the local estimate (§5.3).</div></div>' +
     (full
       ? '<div class="grid2">' +
         '<div class="card"><h2>By day</h2>' + tab(full.byDay, 'day') + '</div>' +
@@ -755,6 +877,13 @@ pages.usage = async (root) => {
         '<div class="card"><h2>By model</h2>' + tab(full.byModel, 'model') + '</div>' +
         '</div><div class="muted">' + esc(full.label) + '</div>'
       : '');
+  const numOrNull = (id) => { const v = $('#' + id).value; return v === '' ? null : Number(v); };
+  $('#calSave').onclick = async () => {
+    try {
+      await api('/api/usage/calibration', { method: 'PUT', body: { actualPct: numOrNull('calPct'), weeklyResetDay: numOrNull('calDay'), weeklyResetHour: numOrNull('calHour') } });
+      savedToast('Calibration saved.'); route();
+    } catch (e) { fail(e); }
+  };
 };
 
 // ---- F-Act ----
@@ -796,11 +925,14 @@ pages.activity = async (root) => {
 pages.loop = async (root) => {
   root.innerHTML =
     '<div class="card"><h2>Approval queue</h2><div id="apr">' + skeleton(3) + '</div></div>' +
+    '<div class="card"><h2>Escalations <span class="muted">decidable — pick a priced option</span></h2><div id="esc">…</div></div>' +
+    '<div class="card"><h2>Tasks (state machine)</h2><div id="tasks">…</div></div>' +
     '<div class="card"><h2>Steer a running task</h2>' +
     '<div class="row"><input type="text" id="taskId" aria-label="task id" placeholder="task id" style="width:200px"></div>' +
     '<textarea id="guidance" aria-label="guidance text" placeholder="guidance for the task (injected as marked data, never executed)"></textarea>' +
     '<div class="row"><button class="primary" id="steer">Steer</button></div></div>' +
     '<div class="card"><h2>Recent loop events</h2><pre id="events">…</pre></div>' +
+    '<div class="card"><h2>Latest calibration</h2><pre id="cal">…</pre></div>' +
     '<div class="banner red" style="align-items:center"><b>Kill switch</b>' +
     '<span class="muted" style="flex:1">stops the autonomous loop immediately; the event log is preserved</span>' +
     '<button class="danger" id="kill">KILL loop</button></div>';
@@ -816,17 +948,56 @@ pages.loop = async (root) => {
         '<button class="danger" data-v="rejected" data-id="' + esc(p.id) + '">Reject</button></div></div>').join('')
         : empty('No pending approvals');
       const ev = await api('/api/loop/events?since=0');
-      $('#events').textContent = (ev.events ?? []).slice(-30).map((e) => e.seq + ' ' + e.type + ' ' + e.taskId).join('\\n') || '(empty)';
+      const events = ev.events ?? [];
+      // derive per-task latest state from the event stream (task graph + state machine view)
+      const latest = {};
+      for (const e of events) { if (e.taskId && e.taskId !== '*') latest[e.taskId] = e; }
+      const taskRows = Object.keys(latest).sort();
+      $('#tasks').innerHTML = taskRows.length
+        ? '<table><tr><th>Task</th><th>State (latest event)</th><th>#</th><th style="text-align:right">Control</th></tr>' + taskRows.map((tid) =>
+            '<tr><td><code>' + esc(tid) + '</code></td><td>' + esc(latest[tid].type) + '</td><td class="muted">' + esc(latest[tid].seq) + '</td>' +
+            '<td style="text-align:right;white-space:nowrap"><button class="ghost" data-pause="' + esc(tid) + '">pause</button>' +
+            '<button class="ghost" data-resume="' + esc(tid) + '">resume</button></td></tr>').join('') + '</table>' +
+          '<div class="muted">Pause finishes the current atomic action then holds — resume continues. Distinct from the irreversible Kill switch below.</div>'
+        : empty('No task activity yet');
+      $('#events').textContent = events.slice(-30).map((e) => e.seq + ' ' + e.type + ' ' + e.taskId).join('\\n') || '(empty)';
     } catch (e) {
       if (IGNORED.has(String(e.message)) || !root.isConnected) return;
       $('#apr').innerHTML = empty('Loop not running', 'Human Plane API not reachable — start a loop from the Scheduler or scripts/run-*.mjs');
+      $('#tasks').innerHTML = empty('Loop not running');
       $('#events').textContent = '(loop not running)';
     }
+    try {
+      const { escalations } = await api('/api/loop/escalations');
+      $('#esc').innerHTML = (escalations && escalations.length) ? escalations.map((x) =>
+        '<div class="card"><div class="row"><b>' + esc(x.taskId || '') + '</b><span class="pill">' + esc(x.reason || 'escalation') + '</span></div>' +
+        '<p>' + esc(x.question || '') + '</p><div class="row">' +
+        (x.options || []).map((o) =>
+          '<button class="primary" data-esc="' + esc(x.id) + '" data-opt="' + esc(o.label) + '">' + esc(o.label) +
+          ((o.estimatedCost != null || o.risk != null) ? ' <span class="muted">(' + esc(o.estimatedCost != null ? o.estimatedCost : '') + (o.risk != null ? ' · risk ' + esc(o.risk) : '') + ')</span>' : '') +
+          '</button>').join('') + '</div></div>').join('')
+        : empty('No escalations');
+    } catch (e) { if (!IGNORED.has(String(e.message))) $('#esc').innerHTML = empty('Loop not running'); }
+    try {
+      const c = await api('/api/loop/calibration');
+      $('#cal').textContent = c.calibration ? (c.file ? c.file + '\\n' : '') + JSON.stringify(c.calibration, null, 2) : (c.note || 'none');
+    } catch (e) { if (!IGNORED.has(String(e.message))) $('#cal').textContent = '(unavailable)'; }
   };
   $('#apr').onclick = async (ev) => {
     const b = ev.target.closest('button'); if (!b) return;
     try { await api('/api/loop/approvals/' + b.dataset.id, { method: 'POST', body: { verdict: b.dataset.v } }); toast('Decision recorded: ' + b.dataset.v, 'green'); refresh(); }
     catch (e) { fail(e); }
+  };
+  $('#esc').onclick = async (ev) => {
+    const b = ev.target.closest('[data-esc]'); if (!b) return;
+    try { await api('/api/loop/escalations/' + b.dataset.esc, { method: 'POST', body: { optionLabel: b.dataset.opt } });
+      toast('Escalation resolved: ' + b.dataset.opt, 'green'); refresh(); } catch (e) { fail(e); }
+  };
+  $('#tasks').onclick = async (ev) => {
+    const p = ev.target.closest('[data-pause]');
+    const r = ev.target.closest('[data-resume]');
+    if (p) { try { await api('/api/loop/pause', { method: 'POST', body: { taskId: p.dataset.pause } }); toast('Paused ' + p.dataset.pause + ' — resume when ready', 'green'); refresh(); } catch (e) { fail(e); } return; }
+    if (r) { try { await api('/api/loop/resume', { method: 'POST', body: { taskId: r.dataset.resume } }); toast('Resumed ' + r.dataset.resume, 'green'); refresh(); } catch (e) { fail(e); } }
   };
   $('#steer').onclick = async () => {
     try { await api('/api/loop/steer', { method: 'POST', body: { taskId: $('#taskId').value, guidance: $('#guidance').value } });
@@ -885,6 +1056,8 @@ pages.system = async (root) => {
     '<button class="primary" id="saveRet">Save</button></div>' +
     '<div class="muted">' + esc(s.retention.warning) + '</div></div>' +
     '</div>' +
+    '<div class="card"><h2>Update</h2><div class="muted">' + esc(s.updateHint || 'unknown') + '</div>' +
+    '<div class="muted" style="margin-top:4px">Run <code>claude update</code> in a terminal to apply.</div></div>' +
     '<div class="card"><h2>Doctor</h2><pre>' + esc(typeof s.doctor === 'string' ? s.doctor : JSON.stringify(s.doctor, null, 2)) + '</pre></div>';
   $('#saveRet').onclick = async () => {
     const v = $('#days').value;

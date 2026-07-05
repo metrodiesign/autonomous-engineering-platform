@@ -118,7 +118,8 @@ describe('F-Sched (§8): opaque process + quota guard', () => {
     expect(blocked.statusCode).toBe(429);
 
     const idle = buildServer({
-      env: { PLATFORM_HUMAN_PLANE_TOKEN_FILE: join(dir, 'token') },
+      // §13.3 spawn allowlist: 'sleep' must be explicitly permitted now
+      env: { PLATFORM_HUMAN_PLANE_TOKEN_FILE: join(dir, 'token'), PLATFORM_SCHED_ALLOWLIST: 'sleep' },
       listSessions: (async () => []) as never,
       getSessionMessages: (async () => []) as never,
       cliVersion: async () => 'test',

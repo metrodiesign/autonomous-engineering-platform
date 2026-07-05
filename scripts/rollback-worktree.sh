@@ -4,7 +4,8 @@
 set -eu
 WT="$1"
 [ -d "$WT" ] || { echo "no such worktree: $WT" >&2; exit 1; }
-if [ -d "$WT/.git" ]; then
+# a linked worktree (from create-worktree.sh) has a .git FILE, not a dir — detect via git itself
+if git -C "$WT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$WT" reset --hard HEAD >/dev/null
   git -C "$WT" clean -fd >/dev/null
   echo "rolled back git worktree $WT"

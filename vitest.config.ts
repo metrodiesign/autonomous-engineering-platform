@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       'core/test/**/*.test.ts',
       'aal/test/**/*.test.ts',
+      'adapters/test/**/*.test.ts',
       'console/backend/test/**/*.test.ts',
       'test/**/*.test.ts',
     ],

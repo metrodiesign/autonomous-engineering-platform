@@ -23,11 +23,24 @@ export interface FusionOutcome {
   costMultiplier: number;
 }
 
+/** Result of verifying one candidate — gate outcome plus a human-readable reason. */
+export interface EvidenceResult {
+  gatePassed: boolean;
+  detail: string;
+}
+
+/**
+ * EVIDENCE-stage verifier (§7.5). Injectable so fusion works for any artifact, not only code diffs:
+ * a code-diff run applies actions + runs gates, a plan run checks the planning gate, a test run
+ * RED-checks each test. Sync or async; the default resolve stays evidence-tournament regardless.
+ */
+export type Verifier = (candidate: Candidate) => EvidenceResult | Promise<EvidenceResult>;
+
 export async function fusePanel(
   adapter: Adapter,
   baseRequest: AgentRequest,
   panelSize: number,
-  runEvidence: (candidate: Candidate) => { gatePassed: boolean; detail: string },
+  runEvidence: Verifier,
 ): Promise<FusionOutcome> {
   // PANEL: independent runs (distinct requestIds — idempotency must not dedupe panelists)
   const candidates: Candidate[] = [];
@@ -36,8 +49,12 @@ export async function fusePanel(
     candidates.push({ panelIndex: i, actions: res.actionRequests, structuredResult: res.structuredResult });
   }
 
-  // EVIDENCE: core runs gates per candidate in isolated worktrees (caller supplies the runner)
-  const evidence: FusionEvidence[] = candidates.map((c) => ({ panelIndex: c.panelIndex, ...runEvidence(c) }));
+  // EVIDENCE: core runs the injected verifier per candidate (isolated worktrees for code diffs)
+  const evidence: FusionEvidence[] = [];
+  for (const c of candidates) {
+    const r = await runEvidence(c);
+    evidence.push({ panelIndex: c.panelIndex, ...r });
+  }
 
   // RESOLVE: evidence tournament — first gate-passing candidate wins; no synthesis of code (chimera risk)
   const winnerEv = evidence.find((e) => e.gatePassed) ?? null;

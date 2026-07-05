@@ -127,6 +127,32 @@ sched stop / hooks uninstall / terminal kill (ผ่าน api()), aria-live toa
 aria-label ทุก input, touch target >=30px, mobile topbar wrap + card overflow ·
 พิสูจน์สด: 17 หน้า render + modal Escape/focus + race test + single-route ผ่านหมด · CI เขียว 85
 
+## Checkpoint 2026-07-05 (3) — Gap-closing sweep: 63/63 จาก audit ปิดครบ
+
+72-agent adversarial audit ยืนยัน 63 gaps (docs/GAP-PLAN.md) → ทีม 6 agents ปิดครบ + security review 3 จุด:
+- Core loop จริงตามสเปก: lease single-writer, T0 ทุก iteration, budget 3 มิติ + costUnits, failure
+  fingerprint advisory, RED-first + weak-test bounce, REFACTOR + full re-run + revert (path-confined),
+  repair probes wired, planning gate, escalation package ตัดสินได้, pause-hold/resume, kill จริง
+  (quarantine + CREDENTIAL_REVOKE_REQUIRED), goal contract wiring + amendment guard, context
+  metrics (miss/recall/waste) + reject-unrequested
+- Evidence: INV-10 ครบ (commitHash+envHash+content-addressed store+HMAC sign), golden coverage,
+  escape rate, JSONL export, convention leg, APPLY_PATCH จริง, package_install lane
+- AAL: toolDefs, bridge fallback+repair, lineage + role separation (test_designer ต่างค่าย),
+  susceptibility-aware routing + runtime canary tripwire, token bucket, drift canary + baseline,
+  fusion verifier injectable
+- Console: INV-14 redaction (มี test), launcher gate จริง (setup guidance + insecure warning),
+  consent gates (bypassPermissions/mcp-test/full-shell), sched allowlist + args validation,
+  F-Status doctor/active-runs, F-Sub test-run/delete, F-Skill toggle, F-MCP 3 ชั้น + start-check,
+  F-Hook 5 types + disable-all, F-Usage calibration + reset, F-Term quota (INV-13), F-Loop state
+  table + escalations + pause/resume, INV-17 term guard ทุกกรณี
+- Contracts: goal.yaml.example + parser, 7 JSON schemas, gate-ladder/models/security-plane/
+  fusion-profiles yaml, systemVersion, intake-goal, create-worktree/calibrate/compare-calibration,
+  lessons persist, adapters codex (unverified, D-007) + provider_data_policy
+- Deviations ใหม่: DEV-002 (editor endpoints excluded from redaction — round-trip), DEV-003
+  (ConPTY untested บน darwin)
+
+Final: root CI เขียว 246 tests / 27 files · INV-7 OK · console live-verified 17 หน้า + endpoints ใหม่
+
 ## Session log
 
 - 2026-07-04 — session 1: อ่านสเปกจบ · branch `build/platform` · ไฟล์ควบคุม + Build Plan · เริ่ม spikes

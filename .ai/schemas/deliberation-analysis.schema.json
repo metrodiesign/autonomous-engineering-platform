@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/schemas/deliberation-analysis.schema.json",
+  "title": "deliberation-analysis",
+  "description": "Blind-judge deliberation over a fusion panel (§7.5/§11.3): compares candidates, never merges code. Mirrors aal/src/fusion.ts FusionOutcome (evidence per panelist, dissent notes, cost multiplier).",
+  "type": "object",
+  "required": ["evidence"],
+  "additionalProperties": true,
+  "properties": {
+    "winnerPanelIndex": { "type": "integer" },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["panelIndex", "gatePassed", "detail"],
+        "additionalProperties": true,
+        "properties": {
+          "panelIndex": { "type": "integer" },
+          "gatePassed": { "type": "boolean" },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "dissent": { "type": "array", "items": { "type": "string" } },
+    "costMultiplier": { "type": "number" }
+  }
+}

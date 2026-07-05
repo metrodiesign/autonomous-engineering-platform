@@ -15,12 +15,22 @@ export interface ContextBundle {
   manifestRef: string;
 }
 
+/** Tool the agent may request (§7.1). Definitions only — core still executes (INV-1/INV-9). */
+export interface ToolDef {
+  name: string;
+  description: string;
+  /** JSON Schema for the tool's arguments */
+  inputSchema: Record<string, unknown>;
+}
+
 export interface AgentRequest {
   requestId: string;
   agentRole: 'planner' | 'test_designer' | 'implementer' | 'reviewer' | 'diagnostician';
   taskContract: TaskContract;
   contextBundle: ContextBundle;
   outputSchema: Record<string, unknown>;
+  /** tools the agent may request via REQUEST_TOOL actions (§7.1); adapters without tool calling ignore it */
+  toolDefs?: ToolDef[];
   budget: { costUnits: number };
   determinismHint?: { seed?: number; temperature?: number };
 }
@@ -53,6 +63,10 @@ export interface CapabilityManifest {
   contextWindowTokens: number;
   executionBackend: boolean; // core executor is default regardless (§7.2)
   seedDeterminism: boolean;
+  /** model family/version — router prefers a same-lineage fallback when the primary is down (§7.2) */
+  lineage?: { family: string; version?: string };
+  /** P7 conformance outcome: true if the injection canary tripped — steer untrusted context elsewhere (§7.4) */
+  injectionSusceptible?: boolean;
 }
 
 /** Ring 2 adapter surface — wire-format translation only (INV-8). */

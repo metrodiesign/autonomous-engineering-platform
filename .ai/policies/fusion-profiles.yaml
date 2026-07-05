@@ -1,0 +1,43 @@
+# fusion-profiles.yaml (§7.5 / §14) — fusion plane configuration.
+# Default OFF. Measured on THIS system: .ai/calibration/fusion-measure-2026-07-05.json shows
+# upliftObserved=false at n=1 (the single run already passed), so paying ~2x for a self-panel is
+# not justified yet. Enabling ANY profile requires BOTH (a) calibration evidence of uplift AND
+# (b) human approval — never auto-learned (§7.5, INV-16). core/aal do not read this file; the live
+# default lives in aal/src/fusion.ts. This documents intent and gates enablement.
+version: 1
+default: "off"
+
+enable_requires:
+  uplift_observed_in_calibration: true
+  human_approval: true
+
+# §7.5 resolve rule per artifact — one pipeline, different RESOLVE
+resolve_rules:
+  plan: deliberate-synthesis
+  code_diff: evidence-tournament   # judges never overrule gates (overrule = 0); no code synthesis (chimera risk)
+  tests: union                     # dedupe + RED-check each test individually
+  hypotheses: union-rank-by-probe-cost
+  reviews: weighted-ensemble       # dissent is an escalation signal, not out-voted
+
+profiles:
+  - id: self-panel
+    description: cheapest diversity — one adapter, N independent runs (seed/temperature variation)
+    panel_size: 2
+    tie_break: evidence-tournament   # first gate-passing candidate wins; ties -> lowest panel index
+    cost_multiplier: 2
+    status: "off"
+    evidence: fusion-measure-2026-07-05.json (upliftObserved=false, n=1 — evidence, not a rate)
+  - id: cross-vendor-panel
+    description: different model families in the panel — pay only after self-panel proves too weak
+    panel_size: 3
+    tie_break: evidence-tournament
+    cost_multiplier: "4-5"
+    status: "off"
+    note: highest quota cost (§5.4) — gate behind calibration uplift + human approval
+
+# §7.5 entry points (only take effect when a profile is enabled)
+entry_points:
+  - planning (always)
+  - risk L2+
+  - repeated failure
+  - agent-invoked fusion.deliberate (budget cap, depth <= 1)

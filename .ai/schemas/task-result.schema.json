@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/schemas/task-result.schema.json",
+  "title": "task-result",
+  "description": "Agent structured result for an implementation iteration (§11.3). The claim is advisory only — core always re-runs gates itself (INV-1). Mirrors aal/src/bridge.ts OUTPUT_SCHEMA and core Proposal.",
+  "type": "object",
+  "required": ["claim"],
+  "additionalProperties": true,
+  "properties": {
+    "claim": { "type": "string", "enum": ["GREEN", "WORKING", "BLOCKED"] },
+    "note": { "type": "string" },
+    "actions": { "type": "array" }
+  }
+}

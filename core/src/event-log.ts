@@ -1,5 +1,6 @@
 // Append-only event log + lease (INV-10). SQLite WAL for atomic compare-and-set.
 import Database from 'better-sqlite3';
+import { writeFileSync } from 'node:fs';
 import type { PlatformEvent } from './types.js';
 
 export interface Lease {
@@ -67,6 +68,13 @@ export class EventLog {
       .prepare('SELECT * FROM events ORDER BY seq')
       .all()
       .map((r) => this.rowToEvent(r as Record<string, unknown>));
+  }
+
+  /** export the full log as JSONL for out-of-band audit (§6.2). SQLite stays the source of truth. */
+  exportJsonl(filePath: string): number {
+    const events = this.all();
+    writeFileSync(filePath, events.map((e) => JSON.stringify(e)).join('\n') + (events.length ? '\n' : ''));
+    return events.length;
   }
 
   /** atomic CAS claim — single writer per task (§6.2) */

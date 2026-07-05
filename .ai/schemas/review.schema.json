@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/schemas/review.schema.json",
+  "title": "review",
+  "description": "Reviewer output (§11.3). A structured verdict + reasons, never free text — dissent is an escalation signal, not a vote (§7.5). Verdict/reason mirror the shape of core/src/merge-policy.ts MergeDecision.",
+  "type": "object",
+  "required": ["verdict", "reason"],
+  "additionalProperties": true,
+  "properties": {
+    "reviewId": { "type": "string" },
+    "taskId": { "type": "string" },
+    "verdict": { "type": "string", "enum": ["approve", "request_changes", "reject"] },
+    "reason": { "type": "string" },
+    "findings": { "type": "array", "items": { "type": "string" } },
+    "reviewLineage": { "type": "string" }
+  }
+}

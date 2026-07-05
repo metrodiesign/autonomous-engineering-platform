@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/schemas/approval-package.schema.json",
+  "title": "approval-package",
+  "description": "Human approval package (§10.3/§11.3): a decidable diff + evidence + attestations, never a pile of logs. Mirrors core/src/human.ts ApprovalPackage.",
+  "type": "object",
+  "required": ["taskId", "riskLevel", "goalExcerpt", "diff"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "taskId": { "type": "string" },
+    "riskLevel": { "type": "string", "enum": ["L0", "L1", "L2", "L3", "L4"] },
+    "goalExcerpt": { "type": "string" },
+    "diff": { "type": "string" },
+    "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "unresolvedRisks": { "type": "array", "items": { "type": "string" } },
+    "attestationChecklist": { "type": "array", "items": { "type": "string" } },
+    "createdAt": { "type": "integer" },
+    "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+  }
+}

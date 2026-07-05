@@ -2,6 +2,7 @@
 export * from './types.js';
 export * from './event-log.js';
 export * from './policy.js';
+export * from './evidence.js';
 export * from './executor.js';
 export * from './gates.js';
 export * from './golden.js';
@@ -16,4 +17,8 @@ export * from './security-plane.js';
 export * from './auditor.js';
 export * from './merge-queue.js';
 export * from './planning-gate.js';
+export * from './escalation.js';
 export * from './lessons.js';
+export * from './goal-contract.js';
+export * from './goal-loop.js';
+export * from './system-version.js';

@@ -5,6 +5,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionSearch } from './search.js';
 import type { ActionRegistry } from './actions.js';
+import { redactJson } from './redact.js';
 
 export interface SessionOpsDeps {
   renameSession?: typeof renameSession;
@@ -72,7 +73,8 @@ export function registerSessionOps(app: FastifyInstance, deps: SessionOpsDeps): 
       const messages = await gsm(req.params.id, req.query.dir ? { dir: req.query.dir } : undefined);
       audit({ type: 'SESSION_EXPORT', sessionId: req.params.id, count: messages.length, ts: Date.now() });
       reply.header('content-disposition', `attachment; filename="${req.params.id}.jsonl"`);
-      return reply.type('application/jsonl').send(messages.map((m) => JSON.stringify(m)).join('\n') + '\n');
+      // INV-14: redact each message before serializing (per-object walk keeps JSONL valid)
+      return reply.type('application/jsonl').send(messages.map((m) => JSON.stringify(redactJson(m))).join('\n') + '\n');
     },
   );
 
@@ -83,7 +85,8 @@ export function registerSessionOps(app: FastifyInstance, deps: SessionOpsDeps): 
   });
 
   app.get<{ Querystring: { q?: string; limit?: string } }>('/api/sessions/search', async (req) => {
-    return { hits: search.query(req.query.q ?? '', Number(req.query.limit ?? 20)) };
+    // INV-14: snippets are raw transcript slices — redact before returning
+    return redactJson({ hits: search.query(req.query.q ?? '', Number(req.query.limit ?? 20)) });
   });
 
   app.get<{ Params: { id: string } }>('/api/actions/:id/status', async (req, reply) => {

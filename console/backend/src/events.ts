@@ -5,6 +5,7 @@ import type { ServerResponse } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { redactJson } from './redact.js';
 
 const RING_SIZE = 500;
 const MARKER = 'platform-console-activity'; // identifies our hook entries for one-click uninstall
@@ -22,7 +23,8 @@ export function registerEvents(
   const listeners = new Set<ServerResponse>();
 
   app.post('/api/events/ingest', async (req) => {
-    const ev: FeedEvent = { seq: ++seq, ts: Date.now(), body: req.body ?? null };
+    // INV-14: hook payloads (tool args, env) can carry secrets — redact before store + SSE
+    const ev: FeedEvent = { seq: ++seq, ts: Date.now(), body: redactJson(req.body ?? null) };
     ring.push(ev);
     if (ring.length > RING_SIZE) ring.shift();
     const line = `data: ${JSON.stringify(ev)}\n\n`;

@@ -18,15 +18,26 @@ function safeJsonForScript(v: unknown): string {
     .replace(/\u2029/g, '\\u2029');
 }
 
-export function registerTerminal(app: FastifyInstance, ptys: PtyManager): void {
+export interface TerminalOptions {
+  /** INV-17: gate WS upgrades by peer address (no provider → loopback only). Default: allow all. */
+  peerAllowed?: (remoteAddress: string) => boolean;
+}
+
+export function registerTerminal(app: FastifyInstance, ptys: PtyManager, opts: TerminalOptions = {}): void {
+  const peerAllowed = opts.peerAllowed ?? (() => true);
   // single-use WS tickets (§13.3)
   const tickets = new Map<string, { termId: string; expires: number }>();
 
-  app.post<{ Body: { cwd?: string; resume?: string; mode?: 'claude-only' | 'full-shell' } }>(
+  app.post<{ Body: { cwd?: string; resume?: string; mode?: 'claude-only' | 'full-shell'; consent?: boolean } }>(
     '/api/term',
     async (req, reply) => {
-      const { cwd, resume, mode } = req.body ?? {};
+      const { cwd, resume, mode, consent } = req.body ?? {};
       if (!cwd) return reply.code(400).send({ error: 'cwd required' });
+      // §13.3 / INV-17: "full shell" is opt-in — an unrestricted shell, not just claude.
+      // claude-only stays frictionless.
+      if (mode === 'full-shell' && consent !== true) {
+        return reply.code(428).send({ error: 'consent required: full-shell opens an unrestricted shell, not just claude (§13.3)' });
+      }
       try {
         const opts: Parameters<PtyManager['spawn']>[0] = { cwd };
         if (resume) opts.resume = resume;
@@ -67,6 +78,12 @@ export function registerTerminal(app: FastifyInstance, ptys: PtyManager): void {
   app.server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     if (url.pathname !== '/ws/term') return; // other upgrades (none) fall through
+    // INV-17: remote peers must be authed even for WS; when no provider, only loopback may attach.
+    if (!peerAllowed(req.socket?.remoteAddress ?? '')) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     const t = tickets.get(url.searchParams.get('ticket') ?? '');
     tickets.delete(url.searchParams.get('ticket') ?? ''); // single-use
     if (!t || t.expires < Date.now()) {
@@ -105,11 +122,16 @@ const TERMINAL_HTML = (xtermJs: string, xtermCss: string, bootJson: string) => /
   #t { height: calc(100% - 26px); }
 </style></head>
 <body>
-<div id="bar">F-Term — real claude CLI via PTY (close tab = detach, session keeps running)</div>
+<div id="bar">F-Term — real claude CLI via PTY (close tab = detach, session keeps running) <span id="quota" style="color:#888"></span></div>
 <div id="t"></div>
 <script>${xtermJs}</script>
 <script>
   const BOOT = ${bootJson};
+  // INV-13: surface the shared-quota estimate here too (fail-open — a dead endpoint never blocks the terminal)
+  fetch('/api/usage').then((r) => r.json()).then((u) => {
+    const q = document.getElementById('quota');
+    if (q && u && u.currentWindow) q.textContent = '· ~' + u.currentWindow.sessions + ' sessions/5h window (estimate — /usage is official)';
+  }).catch(() => {});
   const term = new Terminal({ cols: 120, rows: 36, convertEol: false });
   window.term = term;
   term.open(document.getElementById('t'));

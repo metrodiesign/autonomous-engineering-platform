@@ -51,5 +51,8 @@ out/
 .ai/human-plane.token
 **/.ai/human-plane.token
 
+# Task worktrees (create-worktree.sh) — isolated per-task checkouts, never committed
+worktrees/
+
 # Playwright MCP artifacts
 .playwright-mcp/

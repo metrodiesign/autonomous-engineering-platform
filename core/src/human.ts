@@ -2,9 +2,20 @@
 // Vendor-neutral; the operator surface (Console) is just another client of this API.
 import { createServer, type Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { EventLog } from './event-log.js';
+import type { Steering } from './steering.js';
+import type { EscalationStore } from './escalation.js';
+
+/** §10.2 kill quarantine: move a worktree aside so its contents can't be reused, and log it. */
+export function quarantineWorktree(dir: string, log: EventLog, taskId = '*'): string | null {
+  if (!existsSync(dir)) return null;
+  const dest = `${dir}-quarantined-${Date.now()}`;
+  renameSync(dir, dest);
+  log.append({ ts: Date.now(), taskId, type: 'WORKTREE_QUARANTINED', principal: 'human', payload: { from: dir, to: dest } });
+  return dest;
+}
 
 export interface ApprovalPackage {
   id: string;
@@ -86,6 +97,10 @@ export interface HumanPlaneDeps {
   onKill?: () => void;
   /** steering hook (§10.3): inject human guidance into a running task as marked data */
   onSteer?: (taskId: string, guidance: string) => { accepted: boolean; reason?: string };
+  /** §10.3 steering controller — enables POST /steering/{pause,inject,resume} and /pause */
+  steering?: Steering;
+  /** §10.3 decidable escalations — enables GET /escalations and POST /escalations/:id */
+  escalations?: EscalationStore;
   tokenFile: string;
 }
 
@@ -102,6 +117,14 @@ export function startHumanPlane(deps: HumanPlaneDeps, port: number): Promise<{ s
     const send = (code: number, body: unknown) => {
       res.writeHead(code, { 'content-type': 'application/json' });
       res.end(JSON.stringify(body));
+    };
+    const readJson = (handler: (body: Record<string, unknown>) => void): void => {
+      let body = '';
+      req.on('data', (c: Buffer) => { body += c.toString(); });
+      req.on('end', () => {
+        try { handler(JSON.parse(body || '{}') as Record<string, unknown>); }
+        catch { send(400, { error: 'bad json' }); }
+      });
     };
     if (++hits > 200) return send(429, { error: 'rate limited' });
     if (req.headers.authorization !== `Bearer ${token}`) return send(401, { error: 'unauthorized' });
@@ -129,30 +152,96 @@ export function startHumanPlane(deps: HumanPlaneDeps, port: number): Promise<{ s
       const since = Number(url.searchParams.get('since') ?? 0);
       return send(200, { events: deps.log.all().filter((e) => (e.seq ?? 0) > since) });
     }
-    if (req.method === 'POST' && url.pathname === '/steer') {
-      let body = '';
-      req.on('data', (c: Buffer) => { body += c.toString(); });
-      req.on('end', () => {
-        try {
-          const { taskId, guidance } = JSON.parse(body || '{}') as { taskId?: string; guidance?: string };
-          if (!taskId || !guidance) return send(400, { error: 'taskId + guidance required' });
-          if (!deps.onSteer) return send(501, { error: 'steering not wired' });
-          const r = deps.onSteer(taskId, guidance);
-          deps.log.append({
-            ts: Date.now(), taskId, type: r.accepted ? 'STEER_ACCEPTED' : 'STEER_REFUSED',
-            principal: 'human', payload: { chars: guidance.length, ...(r.reason ? { reason: r.reason } : {}) },
-          });
-          return send(r.accepted ? 200 : 409, r);
-        } catch {
-          return send(400, { error: 'bad json' });
-        }
+    // §10.3 decidable escalations — list pending, resolve by chosen option label
+    if (req.method === 'GET' && url.pathname === '/escalations') {
+      if (!deps.escalations) return send(501, { error: 'escalations not wired' });
+      return send(200, { escalations: deps.escalations.listPending() });
+    }
+    if (req.method === 'POST' && /^\/escalations\/[^/]+$/.test(url.pathname)) {
+      const id = url.pathname.split('/')[2]!;
+      return readJson((b) => {
+        if (!deps.escalations) return send(501, { error: 'escalations not wired' });
+        const { optionLabel } = b as { optionLabel?: string };
+        if (!optionLabel) return send(400, { error: 'optionLabel required' });
+        const pending = deps.escalations.listPending().find((p) => p.id === id);
+        if (!pending) return send(404, { error: 'not found or already resolved' });
+        const optionIndex = pending.options.findIndex((o) => o.label === optionLabel);
+        if (optionIndex < 0) return send(400, { error: 'optionLabel does not match any option' });
+        const pkg = deps.escalations.resolve(id, optionIndex); // logs ESCALATION_RESOLVED (human, chosen)
+        return pkg ? send(200, { pkg }) : send(404, { error: 'not found or already resolved' });
       });
-      return;
+    }
+    // §10.3 steering endpoints — PAUSE_REQUESTED -> GUIDANCE_INJECTED -> RESUMED
+    if (req.method === 'POST' && url.pathname === '/steering/pause') {
+      return readJson((b) => {
+        const { taskId } = b as { taskId?: string };
+        if (!taskId) return send(400, { error: 'taskId required' });
+        if (!deps.steering) return send(501, { error: 'steering not wired' });
+        deps.steering.requestPause(taskId); // logs PAUSE_REQUESTED
+        return send(200, { paused: true, taskId, note: 'resume with POST /steering/resume' });
+      });
+    }
+    if (req.method === 'POST' && url.pathname === '/steering/inject') {
+      return readJson((b) => {
+        const { taskId, guidance, touchesAcOrScope } = b as { taskId?: string; guidance?: string; touchesAcOrScope?: boolean };
+        if (!taskId || !guidance) return send(400, { error: 'taskId + guidance required' });
+        if (!deps.steering) return send(501, { error: 'steering not wired' });
+        // inject requires a prior pause; AC/scope guidance is refused (needs a contract amendment)
+        const r = deps.steering.inject(taskId, { text: guidance, touchesAcOrScope: Boolean(touchesAcOrScope) });
+        return send(r.accepted ? 200 : 409, r); // logs GUIDANCE_INJECTED or GUIDANCE_REFUSED_NEEDS_AMENDMENT
+      });
+    }
+    if (req.method === 'POST' && url.pathname === '/steering/resume') {
+      return readJson((b) => {
+        const { taskId } = b as { taskId?: string };
+        if (!taskId) return send(400, { error: 'taskId required' });
+        if (!deps.steering) return send(501, { error: 'steering not wired' });
+        deps.steering.resume(taskId); // logs RESUMED
+        return send(200, { resumed: true, taskId });
+      });
+    }
+    // §10.2 PAUSE (distinct from KILL): finishes the current atomic action then holds; resumable
+    if (req.method === 'POST' && url.pathname === '/pause') {
+      return readJson((b) => {
+        const { taskId } = b as { taskId?: string };
+        if (!taskId) return send(400, { error: 'taskId required' });
+        if (!deps.steering) return send(501, { error: 'steering not wired' });
+        deps.steering.requestPause(taskId); // logs PAUSE_REQUESTED
+        return send(200, {
+          paused: true, taskId,
+          semantics: 'finishes the current atomic action then holds; resume with POST /steering/resume',
+          differsFromKill: 'kill stops everything, requests credential revocation, and quarantines the worktree',
+        });
+      });
+    }
+    // /steer kept for compatibility: delegate to steering.inject when a controller is wired
+    if (req.method === 'POST' && url.pathname === '/steer') {
+      return readJson((b) => {
+        const { taskId, guidance } = b as { taskId?: string; guidance?: string };
+        if (!taskId || !guidance) return send(400, { error: 'taskId + guidance required' });
+        if (deps.steering) {
+          const r = deps.steering.inject(taskId, { text: guidance, touchesAcOrScope: false });
+          return send(r.accepted ? 200 : 409, r);
+        }
+        if (!deps.onSteer) return send(501, { error: 'steering not wired' });
+        const r = deps.onSteer(taskId, guidance);
+        deps.log.append({
+          ts: Date.now(), taskId, type: r.accepted ? 'STEER_ACCEPTED' : 'STEER_REFUSED',
+          principal: 'human', payload: { chars: guidance.length, ...(r.reason ? { reason: r.reason } : {}) },
+        });
+        return send(r.accepted ? 200 : 409, r);
+      });
     }
     if (req.method === 'POST' && url.pathname === '/kill') {
       deps.log.append({ ts: Date.now(), taskId: '*', type: 'KILL_SWITCH', principal: 'human', payload: {} });
-      deps.onKill?.();
-      return send(200, { killed: true });
+      // §10.2: the platform cannot revoke a vendor subscription credential programmatically;
+      // emit an advisory so the operator rotates/revokes it manually.
+      deps.log.append({
+        ts: Date.now(), taskId: '*', type: 'CREDENTIAL_REVOKE_REQUIRED', principal: 'core',
+        payload: { reason: 'kill switch — rotate/revoke vendor credentials manually (§10.2)' },
+      });
+      deps.onKill?.(); // stops the loop via the abort flag + quarantines the worktree
+      return send(200, { killed: true, credentialRevokeRequired: true, note: 'loop aborting; worktree quarantined via onKill; rotate vendor credentials manually' });
     }
     return send(404, { error: 'unknown endpoint' });
   });

@@ -3,11 +3,14 @@
 // Wire-format translation only (INV-8): schema-in-prompt, no tool definitions sent (INV-9).
 import type { Action } from '@platform/core';
 import type { Adapter, AgentRequest, AgentResponse, CapabilityManifest } from '@platform/aal';
+import { enforceProviderDataPolicy } from './errors.js';
 
 export interface OpenAICompatOptions {
   baseUrl: string; // e.g. https://api.example.com/v1 (aggregators are another data processor — check provider_data_policy)
   apiKeyEnv: string; // env var NAME holding the key — value never stored in code or logs
   model: string;
+  /** provider_data_policy (§7.6): the only base URL paths this adapter may talk to */
+  providerDataPolicy?: { allowedPaths: string[] };
 }
 
 const SYSTEM_PROMPT =
@@ -27,8 +30,11 @@ function extractJson(text: string): Record<string, unknown> | null {
 
 export class OpenAICompatAdapter implements Adapter {
   private cache = new Map<string, AgentResponse>();
+  readonly providerDataPolicy: { allowedPaths: string[] };
 
-  constructor(private opts: OpenAICompatOptions) {}
+  constructor(private opts: OpenAICompatOptions) {
+    this.providerDataPolicy = opts.providerDataPolicy ?? { allowedPaths: ['/v1/chat/completions'] };
+  }
 
   manifest(): CapabilityManifest {
     return {
@@ -44,6 +50,8 @@ export class OpenAICompatAdapter implements Adapter {
   async invoke(req: AgentRequest): Promise<AgentResponse> {
     const cached = this.cache.get(req.requestId);
     if (cached) return cached;
+    // provider_data_policy guard (§7.6): refuse endpoints outside the allowlist before any egress
+    enforceProviderDataPolicy(this.opts.baseUrl, '/chat/completions', this.providerDataPolicy.allowedPaths);
     const apiKey = process.env[this.opts.apiKeyEnv];
     if (!apiKey) throw new Error(`missing credentials: env ${this.opts.apiKeyEnv} is not set (adapter unverified, D-007)`);
 

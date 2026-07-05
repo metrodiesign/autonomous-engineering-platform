@@ -48,7 +48,7 @@ export function registerGovernance(app: FastifyInstance, audit: (e: Record<strin
     },
   );
 
-  app.put<{ Params: { scope: Scope }; Querystring: { dir?: string }; Body: { settings: unknown; expectedHash?: string } }>(
+  app.put<{ Params: { scope: Scope }; Querystring: { dir?: string }; Body: { settings: unknown; expectedHash?: string; consent?: boolean } }>(
     '/api/settings/:scope',
     async (req, reply) => {
       const { scope } = req.params;
@@ -56,10 +56,16 @@ export function registerGovernance(app: FastifyInstance, audit: (e: Record<strin
       if (typeof req.body?.settings !== 'object' || req.body.settings === null || Array.isArray(req.body.settings)) {
         return reply.code(400).send({ error: 'settings must be a JSON object' }); // schema validation, minimal tier
       }
+      // INV-16 consent gate (§13.3): enabling bypassPermissions disables every permission prompt.
+      // Covers permissions.defaultMode and any nested/top-level bypassPermissions-like flag.
+      const bypass = JSON.stringify(req.body.settings).includes('bypassPermissions');
+      if (bypass && req.body.consent !== true) {
+        return reply.code(428).send({ error: 'consent required: bypassPermissions disables all permission prompts (INV-16)' });
+      }
       const p = settingsPath(scope, req.query.dir ?? process.cwd());
       const r = safeWrite(p, JSON.stringify(req.body.settings, null, 2) + '\n', req.body.expectedHash);
       if (!r.ok) return reply.code(409).send({ error: r.reason });
-      audit({ type: 'SETTINGS_WRITE', scope, path: p, ts: Date.now() });
+      audit({ type: 'SETTINGS_WRITE', scope, path: p, ...(bypass ? { consented: true } : {}), ts: Date.now() });
       return { ok: true, hash: r.hash, applyTiming: 'next session start' };
     },
   );

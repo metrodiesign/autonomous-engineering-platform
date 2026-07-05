@@ -1,6 +1,7 @@
 // Merge queue (§6.5, Phase 3): serialize integration so attribution is unambiguous.
 // One lane; each item re-verified against the integrated state before landing.
 import type { EventLog } from './event-log.js';
+import { commitHash } from './evidence.js';
 
 export interface QueueItem {
   taskId: string;
@@ -17,7 +18,8 @@ export interface QueueResult {
 export class MergeQueue {
   private queue: QueueItem[] = [];
 
-  constructor(private log: EventLog) {}
+  /** cwd = the integration working tree whose commit is recorded on each landing (INV-10) */
+  constructor(private log: EventLog, private cwd?: string) {}
 
   enqueue(item: QueueItem): void {
     this.queue.push(item);
@@ -32,7 +34,10 @@ export class MergeQueue {
       const ok = item.verify();
       if (ok) {
         item.land();
-        this.log.append({ ts: Date.now(), taskId: item.taskId, type: 'MERGE_LANDED', principal: 'core', payload: {} });
+        this.log.append({
+          ts: Date.now(), taskId: item.taskId, type: 'MERGE_LANDED', principal: 'core',
+          payload: { commitHash: commitHash(this.cwd ?? process.cwd()) },
+        });
         results.push({ taskId: item.taskId, landed: true });
       } else {
         this.log.append({
