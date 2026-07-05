@@ -1,6 +1,6 @@
 // F-Term routes: REST + WS bridge (single-use tickets, §13.3) + xterm.js page.
 import type { FastifyInstance } from 'fastify';
-import { WebSocketServer } from 'ws';
+import type { WsDispatcher } from './ws-dispatcher.js';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -21,10 +21,13 @@ function safeJsonForScript(v: unknown): string {
 export interface TerminalOptions {
   /** INV-17: gate WS upgrades by peer address (no provider → loopback only). Default: allow all. */
   peerAllowed?: (remoteAddress: string) => boolean;
+  /** WS ticket TTL in ms; default 30s. A small value lets tests exercise expiry. */
+  ticketTtlMs?: number;
 }
 
-export function registerTerminal(app: FastifyInstance, ptys: PtyManager, opts: TerminalOptions = {}): void {
+export function registerTerminal(app: FastifyInstance, ptys: PtyManager, wsd: WsDispatcher, opts: TerminalOptions = {}): void {
   const peerAllowed = opts.peerAllowed ?? (() => true);
+  const ticketTtlMs = opts.ticketTtlMs ?? 30_000;
   // single-use WS tickets (§13.3)
   const tickets = new Map<string, { termId: string; expires: number }>();
 
@@ -53,7 +56,7 @@ export function registerTerminal(app: FastifyInstance, ptys: PtyManager, opts: T
 
   app.post<{ Params: { id: string } }>('/api/term/:id/ticket', async (req) => {
     const ticket = randomBytes(16).toString('hex');
-    tickets.set(ticket, { termId: req.params.id, expires: Date.now() + 30_000 });
+    tickets.set(ticket, { termId: req.params.id, expires: Date.now() + ticketTtlMs });
     return { ticket };
   });
 
@@ -73,11 +76,9 @@ export function registerTerminal(app: FastifyInstance, ptys: PtyManager, opts: T
     reply.type('text/html').send(TERMINAL_HTML(xtermJs, xtermCss, boot));
   });
 
-  // WS upgrade on the shared HTTP server; close codes per §13.3
-  const wss = new WebSocketServer({ noServer: true });
-  app.server.on('upgrade', (req, socket, head) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
-    if (url.pathname !== '/ws/term') return; // other upgrades (none) fall through
+  // WS upgrade via the shared dispatcher (single listener; §13.3). Behavior preserved exactly:
+  // pre-upgrade 401 for peer/ticket failures, single-use ticket, post-upgrade 4403 when the PTY is gone.
+  wsd.register('/ws/term', (req, socket, _head, url, upgrade) => {
     // INV-17: remote peers must be authed even for WS; when no provider, only loopback may attach.
     if (!peerAllowed(req.socket?.remoteAddress ?? '')) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -91,7 +92,7 @@ export function registerTerminal(app: FastifyInstance, ptys: PtyManager, opts: T
       socket.destroy();
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => {
+    upgrade((ws) => {
       try {
         const { replay, detach } = ptys.attach(t.termId, (data) => {
           if (ws.readyState === 1) ws.send(data);

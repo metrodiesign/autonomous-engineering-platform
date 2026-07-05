@@ -12,6 +12,7 @@ import { estimateUsage, usageBreakdown, evaluateAlerts, type SessionStat } from 
 import { INDEX_HTML } from './web.js';
 import { PtyManager } from './pty-manager.js';
 import { registerTerminal } from './terminal.js';
+import { createWsDispatcher } from './ws-dispatcher.js';
 import { registerGovernance } from './governance.js';
 import { registerExtensions } from './extensions.js';
 import { registerLoopConsole } from './loop-console.js';
@@ -132,7 +133,8 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
   }
 
   const ptys = deps.ptyManager ?? new PtyManager(audit);
-  registerTerminal(app, ptys, { peerAllowed: termPeerAllowed });
+  const wsd = createWsDispatcher(app.server);
+  registerTerminal(app, ptys, wsd, { peerAllowed: termPeerAllowed });
   registerGovernance(app, audit);
 
   const search = deps.sessionOps?.search
