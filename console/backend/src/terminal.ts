@@ -9,7 +9,7 @@ import { PtyManager } from './pty-manager.js';
 const require_ = createRequire(import.meta.url);
 
 /** JSON safe for inline <script> interpolation — blocks </script> breakout (XSS) */
-function safeJsonForScript(v: unknown): string {
+export function safeJsonForScript(v: unknown): string {
   return JSON.stringify(v)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
@@ -149,7 +149,7 @@ const TERMINAL_HTML = (xtermJs: string, xtermCss: string, bootJson: string) => /
     }
     window.termId = termId;
     const { ticket } = await (await fetch('/api/term/' + termId + '/ticket', { method: 'POST' })).json();
-    const ws = new WebSocket('ws://' + location.host + '/ws/term?ticket=' + ticket);
+    const ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws/term?ticket=' + ticket);
     ws.onmessage = (e) => term.write(e.data);
     term.onData((d) => ws.send(d));
     term.onResize(({ cols, rows }) => ws.send('\\u0000resize:' + cols + 'x' + rows));

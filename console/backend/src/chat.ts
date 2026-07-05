@@ -10,6 +10,7 @@ import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { WsDispatcher } from './ws-dispatcher.js';
 import { makeChatSandbox } from './chat-permission.js';
 import { redactJson } from './redact.js';
+import { safeJsonForScript } from './terminal.js';
 
 export interface ChatUserTurn { content: string }
 
@@ -128,6 +129,11 @@ export function registerChat(app: FastifyInstance, wsd: WsDispatcher, deps: Chat
 
   app.get('/api/chat', async () => ({ chats: [...sessions.values()].map((s) => ({ id: s.id, cwd: s.cwd, attached: s.attached, createdAt: s.createdAt })) }));
 
+  // Standalone chat page (like /terminal): owns its own WS lifecycle in a dedicated tab.
+  app.get<{ Querystring: { project?: string } }>('/chat', async (req, reply) => {
+    reply.type('text/html').send(CHAT_HTML(safeJsonForScript({ project: req.query.project ?? process.cwd() })));
+  });
+
   app.post<{ Params: { id: string } }>('/api/chat/:id/ticket', async (req, reply) => {
     if (!sessions.has(req.params.id)) return reply.code(404).send({ error: 'unknown chat session' });
     const ticket = randomBytes(16).toString('hex');
@@ -189,3 +195,99 @@ export function registerChat(app: FastifyInstance, wsd: WsDispatcher, deps: Chat
     });
   });
 }
+
+// Standalone chat UI. Model content is rendered via textContent (never innerHTML) so a crafted
+// assistant/tool string cannot inject markup (Codex review). Responsive + theme-aware.
+const CHAT_HTML = (bootJson: string): string => /* html */ `<!doctype html>
+<html><head><meta charset="utf-8"><title>Chat — Platform Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light dark;
+    --bg:#f6f7f9; --surface:#fff; --fg:#1a1d21; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#4f46e5; --accent-fg:#fff; --tool:#0f766e; --err:#b91c1c; }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#0d0f12; --surface:#16191d; --fg:#e6e8eb; --muted:#8b94a0; --line:#262b31;
+    --accent:#7c7bff; --accent-fg:#0d0f12; --tool:#2dd4bf; --err:#f87171; } }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; }
+  body { display:flex; flex-direction:column; background:var(--bg); color:var(--fg);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  #bar { padding:8px 14px; font-size:12px; color:var(--muted); background:var(--surface);
+    border-bottom:1px solid var(--line); flex-shrink:0; }
+  #bar b { color:var(--fg); }
+  #log { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px;
+    max-width:820px; width:100%; margin:0 auto; }
+  .msg { padding:9px 13px; border-radius:12px; white-space:pre-wrap; word-break:break-word; max-width:88%; }
+  .msg.user { align-self:flex-end; background:var(--accent); color:var(--accent-fg); border-bottom-right-radius:4px; }
+  .msg.assistant { align-self:flex-start; background:var(--surface); border:1px solid var(--line); border-bottom-left-radius:4px; }
+  .msg.tool { align-self:flex-start; font:12px/1.5 ui-monospace,Menlo,monospace; color:var(--tool);
+    background:transparent; border:1px dashed var(--line); }
+  .msg.error { align-self:flex-start; color:var(--err); border:1px solid var(--err); background:transparent; }
+  #composer { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line); background:var(--surface);
+    max-width:820px; width:100%; margin:0 auto; }
+  #msg { flex:1; resize:none; font:inherit; color:var(--fg); background:var(--bg);
+    border:1px solid var(--line); border-radius:10px; padding:9px 12px; max-height:140px; }
+  #msg:focus { outline:none; border-color:var(--accent); }
+  #send { font:inherit; font-weight:600; padding:0 18px; border-radius:10px; border:none;
+    background:var(--accent); color:var(--accent-fg); cursor:pointer; }
+  #send:disabled { opacity:.5; cursor:default; }
+  @media (max-width:600px) { #log,#composer { max-width:100%; } .msg { max-width:94%; } }
+</style></head>
+<body>
+<div id="bar"><b>F-Chat</b> — sandboxed read-only claude (Read files + reason; no exec — use Terminal for that) <span id="status">· starting…</span></div>
+<div id="log"></div>
+<form id="composer">
+  <textarea id="msg" rows="1" placeholder="Ask about the code… (Enter to send, Shift+Enter for newline)" aria-label="message"></textarea>
+  <button id="send" type="submit" disabled>Send</button>
+</form>
+<script>
+  const BOOT = ${bootJson};
+  const log = document.getElementById('log');
+  const statusEl = document.getElementById('status');
+  const sendBtn = document.getElementById('send');
+  const msg = document.getElementById('msg');
+  function bubble(cls) { const d = document.createElement('div'); d.className = 'msg ' + cls; log.appendChild(d); return d; }
+  function addText(cls, text) { const d = bubble(cls); d.textContent = text; log.scrollTop = log.scrollHeight; return d; }
+  function renderAssistant(message) {
+    const content = message && message.content;
+    if (typeof content === 'string') { if (content) addText('assistant', content); return; }
+    if (Array.isArray(content)) for (const b of content) {
+      if (b && b.type === 'text') addText('assistant', b.text || '');
+      else if (b && b.type === 'tool_use') addText('tool', '→ ' + b.name + ' ' + JSON.stringify(b.input || {}));
+    }
+  }
+  function setSend(on) { sendBtn.disabled = !on; }
+  function handleFrame(f) {
+    if (!f || !f.type) return;
+    if (f.type === 'assistant') renderAssistant(f.message);
+    else if (f.type === 'result') statusEl.textContent = '· ready';
+    else if (f.type === 'chat_end') { statusEl.textContent = '· session ended'; setSend(false); }
+    else if (f.type === 'chat_error') addText('error', 'error: ' + (f.message || ''));
+  }
+  let ws = null;
+  (async () => {
+    try {
+      const created = await (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cwd: BOOT.project }) })).json();
+      if (!created.id) { statusEl.textContent = '· ' + (created.error || 'could not start'); return; }
+      const t = await (await fetch('/api/chat/' + created.id + '/ticket', { method: 'POST' })).json();
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/ws/chat?ticket=' + t.ticket);
+      ws.onopen = () => { statusEl.textContent = '· connected · cwd ' + BOOT.project; setSend(true); msg.focus(); };
+      ws.onmessage = (e) => { try { handleFrame(JSON.parse(e.data)); } catch (_) { /* ignore */ } };
+      ws.onclose = () => { statusEl.textContent = '· disconnected'; setSend(false); };
+      ws.onerror = () => { statusEl.textContent = '· connection error'; };
+    } catch (e) { statusEl.textContent = '· ' + e; }
+  })();
+  const form = document.getElementById('composer');
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const text = msg.value.trim();
+    if (!text || !ws || ws.readyState !== 1) return;
+    addText('user', text);
+    ws.send(JSON.stringify({ content: text }));
+    msg.value = ''; msg.style.height = 'auto';
+  };
+  msg.addEventListener('input', () => { msg.style.height = 'auto'; msg.style.height = Math.min(msg.scrollHeight, 140) + 'px'; });
+  msg.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+</script>
+</body></html>`;

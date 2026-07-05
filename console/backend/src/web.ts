@@ -183,6 +183,7 @@ const ICONS = {
   projects: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
   sessions: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
   terminal: 'M4 17l6-5-6-5M12 19h8',
+  chat: 'M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z',
   usage: 'M12 20V10M18 20V4M6 20v-4',
   activity: 'M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16M5 20a1 1 0 1 0 0-1',
   loop: 'M17 2l4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3',
@@ -200,7 +201,7 @@ const ICONS = {
 const NAV = [
   { group: 'Operate', items: [
     ['status', 'Status'], ['projects', 'Projects'], ['sessions', 'Sessions'],
-    ['terminal', 'Terminal'], ['usage', 'Usage & Quota'], ['activity', 'Activity Feed'] ] },
+    ['terminal', 'Terminal'], ['chat', 'Chat'], ['usage', 'Usage & Quota'], ['activity', 'Activity Feed'] ] },
   { group: 'Autonomous', items: [ ['loop', 'Loop Console'], ['sched', 'Scheduler'] ] },
   { group: 'Govern', items: [
     ['settings', 'Settings'], ['permissions', 'Permissions'], ['auth', 'Auth & Env'], ['memory', 'Memory'] ] },
@@ -528,6 +529,28 @@ pages.terminal = async (root) => {
     const b = ev.target.closest('button[data-id]'); if (!b) return;
     if (await confirmDialog('Kill terminal?', b.dataset.id + ' — the CLI process is terminated.', { danger: true, action: 'Kill' })) {
       try { await api('/api/term/' + b.dataset.id, { method: 'DELETE' }); route(); } catch (e) { fail(e); }
+    }
+  };
+};
+
+// ---- F-Chat (management; the live chat is the standalone /chat page in a new tab) ----
+pages.chat = async (root) => {
+  const { chats } = await api('/api/chat').catch(() => ({ chats: [] }));
+  root.innerHTML =
+    '<div class="card"><h2>New chat</h2>' +
+    '<div class="row"><button class="primary" id="newchat">💬 Start chat</button>' +
+    '<span class="muted">sandboxed read-only claude (Read + reason; no exec) · cwd = ' + esc(getProject() || 'server cwd') + '</span></div>' +
+    '<div class="muted">Opens in a new tab. Closing the tab ends the session. To run commands, use the Terminal.</div></div>' +
+    '<div class="card"><h2>Active chats <span class="pill">' + chats.length + '</span></h2>' +
+    (chats.length ? '<table><tr><th>ID</th><th>Directory</th><th></th></tr>' + chats.map((c) =>
+      '<tr><td><code>' + esc(c.id) + '</code></td><td class="muted">' + esc(c.cwd) + '</td>' +
+      '<td style="text-align:right"><button class="ghost danger" data-id="' + esc(c.id) + '">end</button></td></tr>').join('') + '</table>'
+      : empty('No active chats', 'Start one — a sandboxed, read-only claude chat')) + '</div>';
+  $('#newchat').onclick = () => window.open('/chat?project=' + encodeURIComponent(getProject() || ''), '_blank');
+  root.onclick = async (ev) => {
+    const b = ev.target.closest('button[data-id]'); if (!b) return;
+    if (await confirmDialog('End chat?', b.dataset.id + ' — the chat session is terminated.', { danger: true, action: 'End' })) {
+      try { await api('/api/chat/' + b.dataset.id, { method: 'DELETE' }); route(); } catch (e) { fail(e); }
     }
   };
 };

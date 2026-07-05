@@ -138,4 +138,13 @@ describe('F-Chat backend (Phase 3a)', () => {
     await newChat(port);
     expect((await openChat(port, 'bogus-ticket')).open).toBe(false);
   });
+
+  it('serves the standalone /chat page', async () => {
+    const { port } = await makeChatApp();
+    const r = await fetch(`${base(port)}/chat?project=/tmp`);
+    expect(r.status).toBe(200);
+    const html = await r.text();
+    expect(html).toContain('F-Chat');
+    expect(html).toContain('/ws/chat');
+  });
 });
