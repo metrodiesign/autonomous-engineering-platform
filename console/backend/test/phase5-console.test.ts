@@ -208,3 +208,36 @@ describe('F-Usage breakdown + alerts (pure)', () => {
     expect(warn.map((a) => a.message).join(' ')).toContain('non-interactive');
   });
 });
+
+describe('§13.3 hardening additions', () => {
+  it('loopback mode rejects non-loopback peers (peer-IP guard)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'p5-'));
+    const app = makeApp(dir);
+    const remote = await app.inject({ url: '/api/status', remoteAddress: '10.0.0.5' });
+    expect(remote.statusCode).toBe(403);
+    const local = await app.inject({ url: '/api/status', remoteAddress: '127.0.0.1' });
+    expect(local.statusCode).toBe(200);
+  });
+
+  it('peer-IP guard is lifted when PLATFORM_CONSOLE_HOST is configured', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'p5-'));
+    const app = makeApp(dir, { env: { PLATFORM_CONSOLE_HOST: '192.168.64.1' } });
+    const r = await app.inject({ url: '/api/status', remoteAddress: '10.0.0.5', headers: { host: '192.168.64.1' } });
+    expect(r.statusCode).toBe(200);
+  });
+
+  it('login cookie gains Secure flag when PLATFORM_CONSOLE_COOKIE_SECURE=1', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'p5-'));
+    const { hashPassword } = await import('../src/auth-provider.js');
+    const app = makeApp(dir, {
+      env: {
+        PLATFORM_CONSOLE_PASSWORD_RECORD: hashPassword('pw12345'),
+        PLATFORM_CONSOLE_SIGNING_SECRET: 's'.repeat(32),
+        PLATFORM_CONSOLE_COOKIE_SECURE: '1',
+      },
+    });
+    const r = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { password: 'pw12345' } });
+    expect(r.statusCode).toBe(200);
+    expect(String(r.headers['set-cookie'])).toContain('; Secure');
+  });
+});

@@ -856,7 +856,10 @@ pages.sched = async (root) => {
     '<input type="text" id="jcmd" aria-label="job command" placeholder="command e.g. ./scripts/calibrate.sh" style="flex:1;min-width:240px"><button class="primary" id="jstart">Start</button></div>' +
     '<div class="muted">Start/stop only — task scheduling and leases belong to the core, not the console.</div></div>';
   $('#jstart').onclick = async () => {
-    try { await api('/api/sched/start', { method: 'POST', body: { name: $('#jname').value, cmd: $('#jcmd').value } }); toast('Started', 'green'); route(); }
+    const name = $('#jname').value, cmd = $('#jcmd').value;
+    // scheduler enable confirmation (§13.3): automation consumes the shared Max quota
+    if (!(await confirmDialog('Start automation job?', name + ' runs "' + cmd + '" unattended and consumes the shared subscription quota (guarded at the threshold above).', { action: 'Start' }))) return;
+    try { await api('/api/sched/start', { method: 'POST', body: { name, cmd } }); toast('Started', 'green'); route(); }
     catch (e) { fail(e); }
   };
   root.onclick = async (ev) => {

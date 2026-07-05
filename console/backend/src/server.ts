@@ -63,11 +63,19 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
 
   // host-header validation (§13.3): block DNS-rebinding — allow loopback names + explicit extra host
   const extraHost = env.PLATFORM_CONSOLE_HOST;
+  const LOOPBACK_PEERS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
   app.addHook('onRequest', async (req, reply) => {
     const host = (req.headers.host ?? '').replace(/:\d+$/, '');
     const allowed = ['127.0.0.1', 'localhost', '::1', '[::1]', ...(extraHost ? [extraHost] : [])];
     if (host && !allowed.includes(host)) {
       return reply.code(403).send({ error: 'host not allowed' });
+    }
+    // peer-IP guard (§13.3): loopback-only mode also rejects non-loopback peers (defense-in-depth)
+    if (!extraHost) {
+      const peer = req.socket?.remoteAddress ?? '';
+      if (peer && !LOOPBACK_PEERS.has(peer)) {
+        return reply.code(403).send({ error: 'remote peer not allowed without PLATFORM_CONSOLE_HOST' });
+      }
     }
   });
 
@@ -82,7 +90,9 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
       const r = provider.login(req.body?.password ?? '');
       audit({ type: 'AUTH_LOGIN', ok: r.ok, ip: req.ip, ts: Date.now() }); // §13.3: auth events audited
       if (!r.ok) return reply.code(r.error === 'rate_limited' ? 429 : 401).send({ error: 'unauthorized' }); // generic
-      reply.header('set-cookie', `session=${r.token}; HttpOnly; SameSite=Lax; Path=/`);
+      // Secure flag when TLS terminates in front of us (§13.3) — set PLATFORM_CONSOLE_COOKIE_SECURE=1
+      const secure = env.PLATFORM_CONSOLE_COOKIE_SECURE === '1' ? '; Secure' : '';
+      reply.header('set-cookie', `session=${r.token}; HttpOnly; SameSite=Lax; Path=/${secure}`);
       return { ok: true, token: r.token };
     });
     app.addHook('preHandler', async (req, reply) => {

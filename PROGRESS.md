@@ -77,9 +77,10 @@ approvals, sched, kill) · consent gate hooks (428) · ไม่มี endpoint 
 rate limit (login 5/min, PTY 5/10s, Human Plane 200/10s) · cookies HttpOnly+SameSite=Lax ·
 core vendor-free CI · autonomous ไม่แตะ Claude Code execution (tools:[] + P6) · interactive approval
 = CLI-native ใน F-Term
-บางส่วน/หมายเหตุ: `Secure` cookie ต้องมี HTTPS — แนะนำ reverse proxy/TLS เมื่อเปิด remote จริง ·
-peer-IP guard บน loopback ยังไม่ทำ · redaction sweep แบบ system-wide เป็น pattern-based เฉพาะจุด ·
-F-Sched first-enable confirmation เป็น API guard (หน้า UI confirm ยังไม่มี)
+ปิดเพิ่ม 2026-07-05: peer-IP guard บน loopback (มี test) · `Secure` cookie ผ่าน
+PLATFORM_CONSOLE_COOKIE_SECURE=1 เมื่อมี TLS/reverse proxy (มี test) · F-Sched confirm dialog ใน UI
+หมายเหตุคงเหลือ (documented decision): redaction sweep เป็น pattern-based เฉพาะจุด — sweep
+ทั้งระบบต้องนิยาม policy จากมนุษย์ (ดู §10.1)
 - [x] Phase 4 — กลไก continuous ครบ 2026-07-05: planning gate §11.2 (uncovered ACs/orphans/
       diff budget) · lessons governance (confirmed-hypothesis-only → human approve → inject เป็น
       marked data) · outcome routing shadow (observe-only, activation ต้องมนุษย์ + n>=50) ·
