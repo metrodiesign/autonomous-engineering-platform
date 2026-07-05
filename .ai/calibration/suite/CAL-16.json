@@ -1,0 +1,15 @@
+{
+  "id": "CAL-16",
+  "title": "stableStringify",
+  "category": "spec-adherence",
+  "difficulty": "hard",
+  "goal": "Create src/stringify.mjs exporting function stableStringify(value): like JSON.stringify but object keys are serialized in ascending order recursively, while array order is preserved.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { stableStringify } from '../../src/stringify.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('stable', () => assert.strictEqual(stableStringify({ b: 1, a: 2 }), '{\"a\":2,\"b\":1}'));\n",
+  "golden": "import { stableStringify } from '../../src/stringify.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden stable', () => {\n  assert.strictEqual(stableStringify({ b: 1, a: 2 }), stableStringify({ a: 2, b: 1 }));\n  assert.strictEqual(stableStringify({ z: { b: 1, a: 2 } }), '{\"z\":{\"a\":2,\"b\":1}}');\n  assert.strictEqual(stableStringify([3, 1, 2]), '[3,1,2]');\n  assert.strictEqual(stableStringify({ b: [2, 1], a: 1 }), '{\"a\":1,\"b\":[2,1]}');\n});\n",
+  "notes": "Golden must stress: two objects with keys in different source order producing identical output, nested objects sorted at every level, and arrays keeping their order. Visible can test one flat object."
+}

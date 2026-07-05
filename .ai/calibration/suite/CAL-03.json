@@ -1,0 +1,15 @@
+{
+  "id": "CAL-03",
+  "title": "isPrime",
+  "category": "edge-cases",
+  "difficulty": "easy",
+  "goal": "Create src/prime.mjs exporting function isPrime(n): true when integer n >= 2 is prime, false otherwise (including 0, 1, negatives, and non-integers).",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { isPrime } from '../../src/prime.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('prime', () => { assert.strictEqual(isPrime(7), true); assert.strictEqual(isPrime(8), false); });\n",
+  "golden": "import { isPrime } from '../../src/prime.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden prime', () => {\n  assert.strictEqual(isPrime(2), true);\n  assert.strictEqual(isPrime(1), false);\n  assert.strictEqual(isPrime(0), false);\n  assert.strictEqual(isPrime(-7), false);\n  assert.strictEqual(isPrime(2.5), false);\n  assert.strictEqual(isPrime(97), true);\n});\n",
+  "notes": "Golden must stress: 2 (true), 1 and 0 (false), a negative (false), a non-integer like 2.5 (false), a larger prime (e.g. 97). Visible can test just 7 and 8."
+}

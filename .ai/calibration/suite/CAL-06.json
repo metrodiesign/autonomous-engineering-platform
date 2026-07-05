@@ -1,0 +1,15 @@
+{
+  "id": "CAL-06",
+  "title": "factorial",
+  "category": "spec-adherence",
+  "difficulty": "easy",
+  "goal": "Create src/factorial.mjs exporting function factorial(n) returning n! for integer n >= 0, and throwing a RangeError for negative or non-integer n.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { factorial } from '../../src/factorial.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('fact', () => assert.strictEqual(factorial(5), 120));\n",
+  "golden": "import { factorial } from '../../src/factorial.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden fact', () => {\n  assert.strictEqual(factorial(0), 1);\n  assert.strictEqual(factorial(1), 1);\n  assert.strictEqual(factorial(5), 120);\n  assert.throws(() => factorial(-1), RangeError);\n  assert.throws(() => factorial(2.5), RangeError);\n});\n",
+  "notes": "Golden must stress: 0! === 1, a small n (e.g. 5 -> 120), and that a negative and a non-integer both throw (assert.throws). Visible can test only 5 -> 120."
+}

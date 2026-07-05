@@ -1,0 +1,45 @@
+# gate-ladder.yaml (§6.4 / §14) — the tier ladder core runs.
+# This mirrors core/src/gates.ts: T0 and T1 are real in this phase; T2 and T3 are explicit
+# stubs that return "not enabled" (runGate returns status not_enabled for T2/T3).
+# Gate-config hash goes into evidence on every run (INV-10). Loosening any tier (e.g. flaky
+# quarantine, higher thresholds) requires human approval and is versioned in the event log (INV-16).
+version: 1
+flaky_retry: true
+tiers:
+  - tier: T0
+    name: fast
+    runs_when: every iteration
+    enabled: true
+    phase: P0
+    includes:
+      - lint
+      - typecheck
+      - targeted tests
+  - tier: T1
+    name: standard
+    runs_when: agent claims GREEN
+    enabled: true
+    phase: P0
+    includes:
+      - full unit and integration tests
+      - convention gate
+      - golden verification for touched acceptance criteria
+  - tier: T2
+    name: full
+    runs_when: before REVIEWING
+    enabled: false
+    phase: stub-until-later
+    includes:
+      - build
+      - scoped E2E
+      - security scan
+      - full golden
+  - tier: T3
+    name: heavy
+    runs_when: merge queue
+    enabled: false
+    phase: stub-until-later
+    includes:
+      - full regression
+      - mutation on changed files
+      - screenshot and a11y

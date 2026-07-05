@@ -1,0 +1,101 @@
+# security-plane.yaml (§10.1 / §14) — declarative mirror of the security plane core ENFORCES.
+# This documents what core already does in code; core does NOT read this file (INV-7 keeps
+# enforcement in core/src, not in an editable policy artifact). It exists so .ai/goal.yaml's
+# quality_gates.security path resolves and operators can review the whole policy in one place.
+# Mirrors core/src/policy.ts (checkActionPolicy) + core/src/security-plane.ts
+# (checkInjectionCanary, checkPackageInstall).
+version: 1
+
+# §10.1 named threats (for reviewer context)
+threats:
+  - id: T1
+    name: prompt injection via repo content
+  - id: T2
+    name: backdoor in an allowed path
+  - id: T3
+    name: exfiltration via a command
+  - id: T4
+    name: supply chain
+  - id: T5
+    name: secret leaking into context
+  - id: T6
+    name: evidence spoofing
+  - id: T7
+    name: system-knowledge poisoning
+
+# Defence-in-depth ladder ordered HARDEST -> SOFTEST. MUST NOT be reordered (§10.1).
+trust_ladder:
+  - tier: 1
+    name: deterministic
+    controls:
+      egress:
+        default: deny
+        note: >-
+          RUN_COMMAND is allowed only with network 'none'; any allowlist:* network is denied
+          this phase (mirror core/src/policy.ts egress-default-deny, INV-14).
+      secret_scan:
+        on_match: block
+        stage: GOVERN
+        note: secret detected in context = block (§9.4)
+      evidence:
+        produced_by: core_only
+        note: core captures child-process output directly and signs it (T6 evidence spoofing)
+      dependency_policy:
+        installers_allowed:
+          - npm
+          - pnpm
+        subcommands_covered:
+          - install
+          - add
+          - i
+        allowed_registries:
+          - https://registry.npmjs.org/
+        forced_flags:
+          - --ignore-scripts
+        note: mirror core/src/security-plane.ts checkPackageInstall (lockfile diff still gate-checked)
+  - tier: 2
+    name: action_level
+    controls:
+      model: propose_dispose
+      worktree_confinement: true
+      golden_read_only: test/golden/**
+      golden_note: read-only for every role (INV-16)
+      write_prefixes:
+        planner: []
+        test_designer:
+          - test/ai-generated
+        implementer:
+          - src
+          - test/ai-generated
+        reviewer: []
+      request_tool:
+        enabled: false
+        note: no tool handlers enabled this phase (mirror core/src/policy.ts)
+  - tier: 3
+    name: measurement
+    controls:
+      injection_canary:
+        runtime_tripwire: true
+        marker_pattern: CANARY-<digits>-TRIPPED
+        on_trip: quarantine_result
+        on_trip_note: >-
+          append INJECTION_CANARY_TRIPPED; do not execute actions from a tainted result
+          (mirror core/src/security-plane.ts checkInjectionCanary).
+        p7_to_susceptibility_routing: true
+        routing_note: >-
+          P7 conformance failure sets manifest.injectionSusceptible; the router steers
+          untrusted context away from susceptible adapters (§7.4, aal/src/router.ts).
+  - tier: 4
+    name: data_marking
+    controls:
+      mark_all_context_as_data: true
+      persona_instruction: true
+    note: useful hope only — never the primary defence (§10.1)
+
+# §10.1 residual risk after the ladder
+residual:
+  risk: a subtle backdoor in L0-L2 auto-merge remains possible
+  mitigations:
+    - sampling_audit
+    - escape_rate_metric
+    - human_l3_review

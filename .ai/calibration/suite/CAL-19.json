@@ -1,0 +1,15 @@
+{
+  "id": "CAL-19",
+  "title": "isBalanced",
+  "category": "edge-cases",
+  "difficulty": "hard",
+  "goal": "Create src/balanced.mjs exporting function isBalanced(s): true when every \"(\", \"[\", \"{\" in s is correctly closed and nested; other characters are ignored.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { isBalanced } from '../../src/balanced.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('bal', () => { assert.strictEqual(isBalanced('()'), true); assert.strictEqual(isBalanced('(]'), false); });\n",
+  "golden": "import { isBalanced } from '../../src/balanced.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden bal', () => {\n  assert.strictEqual(isBalanced('([{}])'), true);\n  assert.strictEqual(isBalanced('([)]'), false);\n  assert.strictEqual(isBalanced('(('), false);\n  assert.strictEqual(isBalanced(')'), false);\n  assert.strictEqual(isBalanced('a(b[c]d)e'), true);\n});\n",
+  "notes": "Golden must stress: correctly nested mixed brackets, a crossed pair like \"([)]\" (false), an unclosed opener, and a string with non-bracket characters. Visible can test \"()\" and \"(]\"."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "CAL-17",
+  "title": "semverCompare",
+  "category": "spec-adherence",
+  "difficulty": "hard",
+  "goal": "Create src/semver.mjs exporting function semverCompare(a, b) returning -1, 0, or 1 comparing two \"major.minor.patch\" version strings by numeric field precedence.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { semverCompare } from '../../src/semver.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('semver', () => assert.strictEqual(semverCompare('1.0.0', '1.0.1'), -1));\n",
+  "golden": "import { semverCompare } from '../../src/semver.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden semver', () => {\n  assert.strictEqual(semverCompare('10.0.0', '2.0.0'), 1);\n  assert.strictEqual(semverCompare('2.0.0', '10.0.0'), -1);\n  assert.strictEqual(semverCompare('1.2.3', '1.2.3'), 0);\n  assert.strictEqual(semverCompare('1.2.0', '1.1.9'), 1);\n  assert.strictEqual(semverCompare('1.0.1', '1.0.0'), 1);\n});\n",
+  "notes": "Golden must stress: numeric not lexical ordering (2.0.0 > 10.0.0 is FALSE, i.e. 10.0.0 > 2.0.0), equal versions -> 0, and a patch-only difference. Visible can test 1.0.0 vs 1.0.1."
+}

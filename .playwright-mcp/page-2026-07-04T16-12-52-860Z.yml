@@ -1,0 +1,93 @@
+- generic [ref=e5]:
+  - textbox "Terminal input" [ref=e6]
+  - generic:
+    - generic:
+      - generic: ╭───
+      - generic: Claude Code
+      - generic: v2.1.201
+      - generic: ─────────────────────────────────────────────────────────────────────────────────────────────╮
+    - generic:
+      - generic: │
+      - generic: │
+      - generic: Tips for getting started
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: Welcome back Supachai!
+      - generic: │
+      - generic: Ask Claude to create a new app or clone a repository
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: │
+      - generic: ───────────────────────────────────────────────────────────────
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: ▐
+      - generic: ▛███▜
+      - generic: ▌
+      - generic: │
+      - generic: What's new
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: ▝▜
+      - generic: █████
+      - generic: ▛▘
+      - generic: │
+      - generic: Claude Sonnet 5 sessions no longer use the mid-conversation sy…
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: ▘▘ ▝▝
+      - generic: │
+      - generic: "Changed `AskUserQuestion` dialogs to no longer auto-continue b…"
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: Haiku 4.5 · Claude Max · metrodiesign@gmail.com's
+      - generic: │
+      - generic: Changed the "default" permission mode to "Manual" across the C…
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: Organization
+      - generic: │
+      - generic: /release-notes for more
+      - generic: │
+    - generic:
+      - generic: │
+      - generic: /…/xv3fxw2n6xd4m32ywbsb9tdm0000gn/T/spike2c-jBCEep
+      - generic: │
+      - generic: │
+    - generic:
+      - generic: ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+    - generic:
+      - generic: ▎
+      - generic: Fable 5 is back.
+    - generic:
+      - generic: ▎
+      - generic: Until July 7, you can use up to 50% of your plan's weekly usage limit on Fable 5. If you hit your limit, you can
+    - generic:
+      - generic: ▎
+      - generic: continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8.
+      - generic: Learn
+      - generic: Â
+      - generic: more
+    - generic:
+      - generic: ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    - generic:
+      - generic: ❯
+    - generic:
+      - generic: ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    - generic:
+      - generic: "[CAVEMAN]"
+      - generic: │
+      - generic: Haiku 4.5
+      - generic: │
+      - generic: spike2c-jBCEep
+    - generic:
+      - generic: $0.00
+    - generic:
+      - generic: ← for agents

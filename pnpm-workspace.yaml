@@ -1,0 +1,9 @@
+packages:
+  # console/web joins in Phase 4 (F-Chat)
+  - core
+  - aal
+  - adapters
+  - console/backend
+allowBuilds:
+  better-sqlite3: true
+  node-pty: true

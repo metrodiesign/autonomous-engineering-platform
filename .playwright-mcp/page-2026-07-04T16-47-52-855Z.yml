@@ -1,0 +1,5 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]: F-Term — real claude CLI via PTY (close tab = detach, session keeps running)
+  - generic [ref=e6]:
+    - generic:
+      - textbox "Terminal input"

@@ -1,0 +1,38 @@
+{
+  "date": "2026-07-04",
+  "model": "haiku",
+  "systemNote": "bootstrap calibration — operator-delegate authored tasks + hidden golden; n=3 so treat as wide interval, not a rate",
+  "heldOutPassed": "3/3",
+  "results": [
+    {
+      "task": "CAL-add",
+      "finalState": "REVIEWING",
+      "iterations": 1,
+      "flaky": false,
+      "goldenPassed": true,
+      "approval": "approved",
+      "wallclockMs": 9301,
+      "worktree": "/var/folders/yg/xv3fxw2n6xd4m32ywbsb9tdm0000gn/T/sl-CAL-add-BL3gy7"
+    },
+    {
+      "task": "CAL-cap",
+      "finalState": "REVIEWING",
+      "iterations": 1,
+      "flaky": false,
+      "goldenPassed": true,
+      "approval": "approved",
+      "wallclockMs": 12048,
+      "worktree": "/var/folders/yg/xv3fxw2n6xd4m32ywbsb9tdm0000gn/T/sl-CAL-cap-ra9NxQ"
+    },
+    {
+      "task": "CAL-prime",
+      "finalState": "REVIEWING",
+      "iterations": 2,
+      "flaky": false,
+      "goldenPassed": true,
+      "approval": "approved",
+      "wallclockMs": 39352,
+      "worktree": "/var/folders/yg/xv3fxw2n6xd4m32ywbsb9tdm0000gn/T/sl-CAL-prime-vxdw22"
+    }
+  ]
+}

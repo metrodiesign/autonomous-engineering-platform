@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/schemas/hypothesis.schema.json",
+  "title": "hypothesis",
+  "description": "A testable repair hypothesis (§9.3/§11.3): core runs the probes (cheaper than patch+verify); refuted ones are always recorded. Mirrors core/src/repair.ts Hypothesis exactly.",
+  "type": "object",
+  "required": ["statement", "probes", "ifConfirmed"],
+  "additionalProperties": true,
+  "properties": {
+    "statement": { "type": "string" },
+    "probes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["cmd", "args", "expectExitCode"],
+        "additionalProperties": false,
+        "properties": {
+          "cmd": { "type": "string" },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "expectExitCode": { "type": "integer" }
+        }
+      }
+    },
+    "ifConfirmed": {
+      "type": "object",
+      "required": ["patchPlan", "estimatedBlastRadius"],
+      "additionalProperties": false,
+      "properties": {
+        "patchPlan": { "type": "string" },
+        "estimatedBlastRadius": { "type": "string" }
+      }
+    }
+  }
+}

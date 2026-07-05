@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/schemas/failure.schema.json",
+  "title": "failure",
+  "description": "Structured failure report from a gate or verification run (§11.3). Mirrors core/src/types.ts GateResult (tier/status/detail/flaky), plus the task and stage it failed at.",
+  "type": "object",
+  "required": ["detail"],
+  "additionalProperties": true,
+  "properties": {
+    "taskId": { "type": "string" },
+    "tier": { "type": "string", "enum": ["T0", "T1", "T2", "T3"] },
+    "stage": { "type": "string" },
+    "detail": { "type": "string" },
+    "gateConfigHash": { "type": "string" },
+    "flaky": { "type": "boolean" }
+  }
+}

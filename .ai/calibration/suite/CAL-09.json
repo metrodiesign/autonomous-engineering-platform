@@ -1,0 +1,15 @@
+{
+  "id": "CAL-09",
+  "title": "chunk",
+  "category": "edge-cases",
+  "difficulty": "medium",
+  "goal": "Create src/chunk.mjs exporting function chunk(arr, size) splitting arr into subarrays of length size (the last may be shorter). Throw a RangeError when size < 1.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { chunk } from '../../src/chunk.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('chunk', () => assert.deepStrictEqual(chunk([1, 2, 3, 4], 2), [[1, 2], [3, 4]]));\n",
+  "golden": "import { chunk } from '../../src/chunk.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden chunk', () => {\n  assert.deepStrictEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);\n  assert.deepStrictEqual(chunk([1], 5), [[1]]);\n  assert.deepStrictEqual(chunk([], 3), []);\n  assert.throws(() => chunk([1, 2], 0), RangeError);\n});\n",
+  "notes": "Golden must stress: a remainder chunk, size larger than the array, an empty array, and that size 0 throws. Visible can test an even split."
+}

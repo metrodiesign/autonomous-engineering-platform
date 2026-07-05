@@ -1,0 +1,15 @@
+{
+  "id": "CAL-18",
+  "title": "editDistance",
+  "category": "generalization",
+  "difficulty": "hard",
+  "goal": "Create src/editdistance.mjs exporting function editDistance(a, b) returning the Levenshtein distance between strings a and b.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { editDistance } from '../../src/editdistance.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('edit', () => assert.strictEqual(editDistance('cat', 'cut'), 1));\n",
+  "golden": "import { editDistance } from '../../src/editdistance.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden edit', () => {\n  assert.strictEqual(editDistance('kitten', 'sitting'), 3);\n  assert.strictEqual(editDistance('', 'abc'), 3);\n  assert.strictEqual(editDistance('abc', ''), 3);\n  assert.strictEqual(editDistance('same', 'same'), 0);\n  assert.strictEqual(editDistance('flaw', 'lawn'), 2);\n});\n",
+  "notes": "Golden must stress: one empty string (distance === other length), the classic \"kitten\"/\"sitting\" === 3, and equal strings === 0. Visible can test a single substitution."
+}

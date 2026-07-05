@@ -1,0 +1,67 @@
+# .ai/goal.yaml (example) — Goal Contract (§11.1).
+# Frozen artifact: change acceptance criteria or scope only via a versioned amendment (bump `version`).
+# Copy to .ai/goal.yaml and edit for a real goal. Block style keeps it parseable by core's
+# dependency-free parser (core/src/goal-contract.ts); it carries the same fields as the §11.1 template.
+version: 1
+goal:
+  id: AUTH-001
+  title: Implement secure authentication
+  objective: Email/password auth for web+API
+business_outcomes:
+  - register
+  - login/logout
+  - refresh tokens
+  - admin revoke sessions
+scope:
+  include:
+    - API
+    - DB migration
+    - Frontend login
+    - tests
+  exclude:
+    - Social login
+    - MFA
+    - Passwordless
+constraints:
+  stack:
+    backend: NestJS
+    frontend: Next.js 16
+    database: PostgreSQL
+  forbidden:
+    - plain-text passwords
+    - unhashed refresh tokens
+    - secrets in logs
+acceptance_criteria:
+  - id: AC-001
+    description: Valid users can log in
+    verification: pnpm test auth-login
+    golden: true
+  - id: AC-002
+    description: Invalid credentials return 401
+    verification: pnpm test auth-invalid
+    golden: true
+  - id: AC-003
+    description: E2E auth scenarios pass
+    verification: pnpm test:e2e auth
+quality_gates:
+  ladder: .ai/policies/gate-ladder.yaml
+  mutation:
+    min_score_on_changed_files: 80
+    tier: T3
+  security: .ai/policies/security-plane.yaml
+  fusion: .ai/policies/fusion-profiles.yaml
+budget:
+  max_iterations_per_task: 8
+  max_hypotheses_per_failure: 3
+  max_total_tasks: 30
+  max_parallel_agents: 3
+  max_cost_units_per_task: 500
+  max_wallclock_per_task_min: 30
+approval_policy:
+  require_human_approval:
+    - production_deployment
+    - destructive_migration
+    - auth_policy_change
+    - secret_or_permission_change
+    - gate_loosening
+    - flaky_quarantine_add

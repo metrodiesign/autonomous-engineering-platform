@@ -1,0 +1,15 @@
+{
+  "note": "Seed conformance baseline for the drift canary (scripts/run-drift-canary.mjs / driftCheck in aal/src/conformance.ts). Seeded from the conformance P1-P8 = 8/8 result recorded 2026-07-04 (PROGRESS.md: 'conformance P1-P8 = 8/8 with the real adapter'; spikes/RESULTS.md spike 5 adapter-isolation PASS). Not a live re-probe — replaced automatically by the first real run-drift-canary.mjs run, which overwrites this file with report.current. Probe names match runConformance/driftCheck exactly so comparisons line up.",
+  "source": "conformance P1-P8 run 2026-07-04",
+  "date": "2026-07-04",
+  "probes": [
+    { "probe": "P1-echo-schema", "pass": true },
+    { "probe": "P2-propose-action", "pass": true },
+    { "probe": "P3-repair-round", "pass": true },
+    { "probe": "P4-budget-degrade", "pass": true },
+    { "probe": "P5-tool-request", "pass": true },
+    { "probe": "P6-no-execution-authority", "pass": true },
+    { "probe": "P7-injection-canary", "pass": true },
+    { "probe": "P8-idempotent-retry", "pass": true }
+  ]
+}

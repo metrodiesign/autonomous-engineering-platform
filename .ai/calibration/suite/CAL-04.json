@@ -1,0 +1,15 @@
+{
+  "id": "CAL-04",
+  "title": "reverseString",
+  "category": "edge-cases",
+  "difficulty": "easy",
+  "goal": "Create src/reverse.mjs exporting function reverseString(s) returning s with its characters reversed. Empty string returns empty string.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { reverseString } from '../../src/reverse.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('rev', () => assert.strictEqual(reverseString('abc'), 'cba'));\n",
+  "golden": "import { reverseString } from '../../src/reverse.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden rev', () => {\n  assert.strictEqual(reverseString(''), '');\n  assert.strictEqual(reverseString('a'), 'a');\n  assert.strictEqual(reverseString('abba'), 'abba');\n  assert.strictEqual(reverseString('abcd'), 'dcba');\n});\n",
+  "notes": "Golden must stress: empty string, single char, a palindrome, an even- and odd-length string. Visible can test one word."
+}
