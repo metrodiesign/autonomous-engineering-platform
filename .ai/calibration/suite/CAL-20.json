@@ -1,0 +1,15 @@
+{
+  "id": "CAL-20",
+  "title": "evalExpr",
+  "category": "spec-adherence",
+  "difficulty": "hard",
+  "goal": "Create src/eval.mjs exporting function evalExpr(s): evaluate an arithmetic expression of non-negative integers with + - * / and parentheses, honoring precedence; \"/\" is integer division truncating toward zero; whitespace is ignored.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { evalExpr } from '../../src/eval.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('eval', () => assert.strictEqual(evalExpr('1+2'), 3));\n",
+  "golden": "import { evalExpr } from '../../src/eval.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden eval', () => {\n  assert.strictEqual(evalExpr('2+3*4'), 14);\n  assert.strictEqual(evalExpr('(2+3)*4'), 20);\n  assert.strictEqual(evalExpr('7/2'), 3);\n  assert.strictEqual(evalExpr(' 2 * 3 + 1 '), 7);\n  assert.strictEqual(evalExpr('2*(3+4*(1+1))'), 22);\n});\n",
+  "notes": "Golden must stress: precedence (2+3*4 === 14), parentheses overriding it ((2+3)*4 === 20), integer division (7/2 === 3), and ignored whitespace. Visible can test \"1+2\"."
+}

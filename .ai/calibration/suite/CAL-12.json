@@ -1,0 +1,15 @@
+{
+  "id": "CAL-12",
+  "title": "deepEqual",
+  "category": "edge-cases",
+  "difficulty": "medium",
+  "goal": "Create src/deepequal.mjs exporting function deepEqual(a, b): structural equality for JSON-like values (nested objects and arrays, primitives). Key order does not matter. NaN equals NaN.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { deepEqual } from '../../src/deepequal.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('deq', () => assert.strictEqual(deepEqual({ a: 1 }, { a: 1 }), true));\n",
+  "golden": "import { deepEqual } from '../../src/deepequal.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden deq', () => {\n  assert.strictEqual(deepEqual({ a: 1, b: 2 }, { b: 2, a: 1 }), true);\n  assert.strictEqual(deepEqual([1, 2], [1, 2, 3]), false);\n  assert.strictEqual(deepEqual(NaN, NaN), true);\n  assert.strictEqual(deepEqual(null, undefined), false);\n  assert.strictEqual(deepEqual({ a: { x: 1 } }, { a: { x: 2 } }), false);\n});\n",
+  "notes": "Golden must stress: nested objects with different key order (equal), arrays of differing length (unequal), NaN vs NaN (equal), and null vs undefined (unequal). Visible can test two flat equal objects."
+}

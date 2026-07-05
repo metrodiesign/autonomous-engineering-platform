@@ -1,0 +1,15 @@
+{
+  "id": "CAL-05",
+  "title": "clamp",
+  "category": "spec-adherence",
+  "difficulty": "easy",
+  "goal": "Create src/clamp.mjs exporting function clamp(n, lo, hi) returning n constrained to the inclusive range [lo, hi].",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { clamp } from '../../src/clamp.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('clamp', () => assert.strictEqual(clamp(5, 0, 10), 5));\n",
+  "golden": "import { clamp } from '../../src/clamp.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden clamp', () => {\n  assert.strictEqual(clamp(-1, 0, 10), 0);\n  assert.strictEqual(clamp(11, 0, 10), 10);\n  assert.strictEqual(clamp(0, 0, 10), 0);\n  assert.strictEqual(clamp(10, 0, 10), 10);\n  assert.strictEqual(clamp(5, 3, 3), 3);\n});\n",
+  "notes": "Golden must stress: n below lo, n above hi, n inside, n exactly on each bound. Decide and pin the lo===hi case."
+}

@@ -17,7 +17,7 @@ echo "calibration systemVersion=$VERSION model=$MODEL"
 CALIBRATION=1 node scripts/run-supervised-loop.mjs "$MODEL"
 
 # stamp the produced record with the systemVersion in its filename
-SRC=$(find .ai/calibration -name "bootstrap-$MODEL-*.json" -type f | sort | tail -n1)
+SRC=$(find .ai/calibration \( -name "suite-$MODEL-*.json" -o -name "bootstrap-$MODEL-*.json" \) -type f | sort | tail -n1)
 [ -n "$SRC" ] || { echo "no calibration record produced" >&2; exit 1; }
 DEST=".ai/calibration/cal-$(date +%Y%m%d)-$VERSION.json"
 cp "$SRC" "$DEST"

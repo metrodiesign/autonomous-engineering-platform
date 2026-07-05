@@ -1,0 +1,15 @@
+{
+  "id": "CAL-11",
+  "title": "parseQuery",
+  "category": "edge-cases",
+  "difficulty": "medium",
+  "goal": "Create src/query.mjs exporting function parseQuery(qs): parse a URL query string (optional leading \"?\") into an object; a repeated key collapses to an array; values are percent-decoded; a key with no \"=\" maps to \"\".",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { parseQuery } from '../../src/query.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('query', () => assert.deepStrictEqual(parseQuery('a=1&b=2'), { a: '1', b: '2' }));\n",
+  "golden": "import { parseQuery } from '../../src/query.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden query', () => {\n  assert.deepStrictEqual(parseQuery('?a=1'), { a: '1' });\n  assert.deepStrictEqual(parseQuery('a=1&a=2'), { a: ['1', '2'] });\n  assert.deepStrictEqual(parseQuery('q=hello%20world'), { q: 'hello world' });\n  assert.deepStrictEqual(parseQuery('flag'), { flag: '' });\n});\n",
+  "notes": "Golden must stress: leading \"?\", a repeated key -> array, a percent-encoded value (e.g. %20), and a bare key -> \"\". Visible can test \"a=1&b=2\"."
+}

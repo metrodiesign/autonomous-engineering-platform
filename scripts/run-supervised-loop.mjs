@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { EventLog, Executor, Orchestrator, StateMachine, buildContext, writeGoldenManifest, ApprovalStore, startHumanPlane, Steering, EscalationStore, quarantineWorktree, parseGoalContract, validateGoalContract, contractToLoopConfig, goalContractHash } from '../core/dist/index.js';
 import { adapterAgentPort } from '../aal/dist/index.js';
 import { AnthropicAdapter } from '../adapters/dist/index.js';
+import { loadSuite, outcomePassed } from './lib/calibration-suite.mjs';
 
 for (const k of Object.keys(process.env)) {
   if (/^(ANTHROPIC_|CLAUDE_CODE_|CLAUDECODE|CLAUDE_)/.test(k)) delete process.env[k];
@@ -15,8 +16,9 @@ for (const k of Object.keys(process.env)) {
 
 const MODEL = process.argv[2] ?? 'haiku';
 
-// calibration tasks: visible RED test + hidden golden the model never sees
-const TASKS = [
+// bootstrap tasks: visible RED test + hidden golden the model never sees.
+// Used only when .ai/calibration/suite/ has no authored tasks yet (see below).
+const BOOTSTRAP_TASKS = [
   {
     id: 'CAL-add',
     goal: 'Create src/calc.mjs exporting function add(a, b) returning the numeric sum.',
@@ -36,6 +38,20 @@ const TASKS = [
     golden: `import { isPrime } from '../../src/prime.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden prime', () => { assert.equal(isPrime(2), true); assert.equal(isPrime(1), false); assert.equal(isPrime(0), false); assert.equal(isPrime(-7), false); assert.equal(isPrime(97), true); assert.equal(isPrime(2.5), false); });\n`,
   },
 ];
+
+// Real suite (.ai/calibration/suite/*.json, human-authored per §12) takes over once at least one
+// task is authored; until then fall back to the bootstrap tasks so calibrate.sh works out of the box.
+const SUITE_DIR = '.ai/calibration/suite';
+const suite = loadSuite(SUITE_DIR);
+for (const iv of suite.invalid) console.error(`skip invalid calibration task ${iv.file}: ${iv.reason}`);
+const usingSuite = suite.authored.length > 0;
+const TASKS = usingSuite ? suite.authored : BOOTSTRAP_TASKS;
+if (usingSuite) {
+  console.log(`calibration suite: ${suite.authored.length} authored, ${suite.stubs.length} unauthored stub(s) skipped`);
+  if (suite.stubs.length) console.log(`  unauthored: ${suite.stubs.map((s) => s.id).join(', ')}`);
+} else {
+  console.log(`no authored tasks in ${SUITE_DIR} — using ${BOOTSTRAP_TASKS.length}-task bootstrap fallback`);
+}
 
 const results = [];
 const adapter = new AnthropicAdapter({ model: MODEL });
@@ -92,7 +108,7 @@ for (const t of TASKS) {
     taskId: t.id,
     goalExcerpt: cfg.goalExcerpt,
     acceptanceCriteria: cfg.acceptanceCriteria,
-    constraints: ['ESM .mjs', 'no dependencies'],
+    constraints: t.constraints ?? ['ESM .mjs', 'no dependencies'],
     contextBundle: { pieces: built.pieces, manifestRef: built.manifest.manifestRef },
   });
 
@@ -147,7 +163,7 @@ for (const t of TASKS) {
     finalState: res.finalState,
     iterations: res.iterations,
     flaky: res.flaky,
-    goldenPassed: res.finalState === 'REVIEWING', // T1 includes hidden golden
+    goldenPassed: outcomePassed(res.finalState, t.expect), // T1 includes hidden golden; refusal tasks compare to t.expect
     approval,
     wallclockMs: Date.now() - started,
     worktree: wt,
@@ -157,14 +173,24 @@ for (const t of TASKS) {
 }
 
 const passed = results.filter((r) => r.goldenPassed).length;
+const n = results.length;
+const today = new Date().toISOString().slice(0, 10);
 const summary = {
-  date: '2026-07-04',
+  date: today,
   model: MODEL,
-  systemNote: 'bootstrap calibration — operator-delegate authored tasks + hidden golden; n=3 so treat as wide interval, not a rate',
-  heldOutPassed: `${passed}/${results.length}`,
+  suite: usingSuite ? 'authored' : 'bootstrap',
+  systemNote: usingSuite
+    ? `calibration suite — authored tasks + hidden golden; n=${n}${n < 10 ? ' (small n → treat as a wide interval, not a rate)' : ''}`
+    : 'bootstrap calibration — operator-delegate authored tasks + hidden golden; n=3 so treat as wide interval, not a rate',
+  heldOutPassed: `${passed}/${n}`,
   results,
 };
 mkdirSync('.ai/calibration', { recursive: true });
-writeFileSync(`.ai/calibration/bootstrap-${MODEL}-2026-07-04.json`, JSON.stringify(summary, null, 2));
-console.log(`SUPERVISED LOOP: held-out pass ${passed}/${results.length} (model=${MODEL})`);
-process.exit(passed > 0 ? 0 : 1);
+const outPath = usingSuite
+  ? `.ai/calibration/suite-${MODEL}-${today}.json`
+  : `.ai/calibration/bootstrap-${MODEL}-2026-07-04.json`;
+writeFileSync(outPath, JSON.stringify(summary, null, 2));
+console.log(`CALIBRATION_RECORD=${outPath}`);
+console.log(`SUPERVISED LOOP: held-out pass ${passed}/${n} (model=${MODEL}, suite=${summary.suite})`);
+// exit 0 whenever a record was produced — the regression gate is compare-calibration.mjs, not this run.
+process.exit(n > 0 ? 0 : 1);

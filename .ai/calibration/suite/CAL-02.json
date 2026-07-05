@@ -1,0 +1,15 @@
+{
+  "id": "CAL-02",
+  "title": "capitalize",
+  "category": "edge-cases",
+  "difficulty": "easy",
+  "goal": "Create src/text.mjs exporting function capitalize(s): uppercase the first character and lowercase the rest. Empty string returns empty string.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { capitalize } from '../../src/text.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('cap', () => assert.strictEqual(capitalize('hello'), 'Hello'));\n",
+  "golden": "import { capitalize } from '../../src/text.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden cap', () => {\n  assert.strictEqual(capitalize('wORLD'), 'World');\n  assert.strictEqual(capitalize(''), '');\n  assert.strictEqual(capitalize('a'), 'A');\n  assert.strictEqual(capitalize('ABC'), 'Abc');\n});\n",
+  "notes": "Golden must stress: empty string -> \"\", single char, an already-mixed-case word (e.g. \"wORLD\" -> \"World\"). Visible can test only the happy \"hello\" -> \"Hello\"."
+}

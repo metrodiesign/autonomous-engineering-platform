@@ -1,0 +1,15 @@
+{
+  "id": "CAL-14",
+  "title": "flatten",
+  "category": "edge-cases",
+  "difficulty": "medium",
+  "goal": "Create src/flatten.mjs exporting function flatten(arr, depth = Infinity) returning arr flattened up to depth levels.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { flatten } from '../../src/flatten.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('flat', () => assert.deepStrictEqual(flatten([1, [2, 3]]), [1, 2, 3]));\n",
+  "golden": "import { flatten } from '../../src/flatten.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden flat', () => {\n  assert.deepStrictEqual(flatten([1, [2, [3, [4]]]]), [1, 2, 3, 4]);\n  assert.deepStrictEqual(flatten([1, [2, [3]]], 1), [1, 2, [3]]);\n  assert.deepStrictEqual(flatten([]), []);\n  assert.deepStrictEqual(flatten([1, [2], 3]), [1, 2, 3]);\n});\n",
+  "notes": "Golden must stress: default (full) depth on a deeply nested array, depth=1 leaving deeper nesting intact, an empty array, and non-array elements untouched. Visible can test one level."
+}

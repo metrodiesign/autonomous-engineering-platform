@@ -1,0 +1,15 @@
+{
+  "id": "CAL-13",
+  "title": "romanToInt",
+  "category": "spec-adherence",
+  "difficulty": "medium",
+  "goal": "Create src/roman.mjs exporting function romanToInt(s) converting an uppercase Roman numeral (I, V, X, L, C, D, M) to its integer value, honoring the subtractive pairs IV, IX, XL, XC, CD, CM.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { romanToInt } from '../../src/roman.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('roman', () => { assert.strictEqual(romanToInt('III'), 3); assert.strictEqual(romanToInt('IV'), 4); });\n",
+  "golden": "import { romanToInt } from '../../src/roman.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden roman', () => {\n  assert.strictEqual(romanToInt('IX'), 9);\n  assert.strictEqual(romanToInt('XL'), 40);\n  assert.strictEqual(romanToInt('XC'), 90);\n  assert.strictEqual(romanToInt('CD'), 400);\n  assert.strictEqual(romanToInt('CM'), 900);\n  assert.strictEqual(romanToInt('LVIII'), 58);\n  assert.strictEqual(romanToInt('MCMXCIV'), 1994);\n});\n",
+  "notes": "Golden must stress each subtractive pair (IV=4, IX=9, XL=40, XC=90, CD=400, CM=900) and a compound (e.g. MCMXCIV=1994). Visible can test III=3 and IV=4."
+}

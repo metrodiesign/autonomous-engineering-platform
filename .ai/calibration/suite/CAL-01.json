@@ -1,0 +1,15 @@
+{
+  "id": "CAL-01",
+  "title": "add",
+  "category": "happy-path",
+  "difficulty": "easy",
+  "goal": "Create src/calc.mjs exporting function add(a, b) returning the numeric sum of a and b.",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { add } from '../../src/calc.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('adds', () => assert.equal(add(1, 2), 3));\n",
+  "golden": "import { add } from '../../src/calc.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden add', () => {\n  assert.equal(add(2, 3), 5);\n  assert.equal(add(-1, 1), 0);\n  assert.equal(add(10, -4), 6);\n});\n",
+  "notes": "Worked example (authored). Copy this shape for the other tasks: weak visible, stricter golden."
+}

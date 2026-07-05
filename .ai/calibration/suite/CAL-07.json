@@ -1,0 +1,15 @@
+{
+  "id": "CAL-07",
+  "title": "fizzbuzz",
+  "category": "spec-adherence",
+  "difficulty": "easy",
+  "goal": "Create src/fizzbuzz.mjs exporting function fizzbuzz(n) returning an array for the values 1..n where a multiple of 3 is \"Fizz\", a multiple of 5 is \"Buzz\", a multiple of 15 is \"FizzBuzz\", and any other value is the number itself (a Number, not a string).",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { fizzbuzz } from '../../src/fizzbuzz.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('fb', () => assert.deepStrictEqual(fizzbuzz(3), [1, 2, 'Fizz']));\n",
+  "golden": "import { fizzbuzz } from '../../src/fizzbuzz.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden fb', () => {\n  const r = fizzbuzz(15);\n  assert.strictEqual(r.length, 15);\n  assert.strictEqual(r[0], 1);\n  assert.strictEqual(typeof r[0], 'number');\n  assert.strictEqual(r[2], 'Fizz');\n  assert.strictEqual(r[4], 'Buzz');\n  assert.strictEqual(r[14], 'FizzBuzz');\n});\n",
+  "notes": "Golden must stress: the 15 case (\"FizzBuzz\"), that non-multiples stay Numbers (typeof), and the array length. Pin the exact return type — this is where overfitting happens."
+}

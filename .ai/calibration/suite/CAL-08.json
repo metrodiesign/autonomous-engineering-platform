@@ -1,0 +1,15 @@
+{
+  "id": "CAL-08",
+  "title": "slugify",
+  "category": "edge-cases",
+  "difficulty": "medium",
+  "goal": "Create src/slugify.mjs exporting function slugify(s): lowercase, trim, replace each run of non-alphanumeric characters with a single \"-\", and strip leading/trailing \"-\".",
+  "constraints": [
+    "ESM .mjs (node --test)",
+    "no third-party dependencies"
+  ],
+  "expect": "REVIEWING",
+  "visible": "import { slugify } from '../../src/slugify.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('slug', () => assert.strictEqual(slugify('Hello World'), 'hello-world'));\n",
+  "golden": "import { slugify } from '../../src/slugify.mjs';\nimport test from 'node:test';\nimport assert from 'node:assert';\ntest('golden slug', () => {\n  assert.strictEqual(slugify('  Hello World  '), 'hello-world');\n  assert.strictEqual(slugify('a  --  b'), 'a-b');\n  assert.strictEqual(slugify('ABC'), 'abc');\n  assert.strictEqual(slugify('!!!'), '');\n  assert.strictEqual(slugify('Foo_Bar.Baz'), 'foo-bar-baz');\n});\n",
+  "notes": "Golden must stress: leading/trailing spaces, runs of punctuation collapsing to one \"-\", mixed case, and a string that is all punctuation -> \"\". Visible can test \"Hello World\" -> \"hello-world\"."
+}
