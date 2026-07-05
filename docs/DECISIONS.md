@@ -64,3 +64,14 @@ curl ผ่าน LAN IP บนเครื่องเดียวกัน · 
 
 `spikes/` standalone package ที่ root (ไม่อยู่ใน §14 structure — เป็นของ pre-Phase 1 เท่านั้น)
 เหตุผล: กัน dependency ของ spike ปนเข้า workspace หลัก · ลบทิ้งได้หลังผ่าน gate
+
+## Confirmation 2026-07-05 — operator via grill-me-codex
+
+ยืนยันผ่าน grill (บันทึกใน PLAN.md / PLAN-REVIEW-LOG.md):
+- D-001 Remote Console = OFF (คง bind 127.0.0.1) · D-002 = Basic-first, OIDC defer (moot ตราบ remote OFF)
+- D-003 usage credits = ถือปิด (alert "จะโดนบล็อก") · D-004 = pool เดียว + label ทุก run
+- Phase-4 polish: สร้าง F-Chat (rich) + full-SPA responsive; คง i18n + canary "ตัด"
+- D-008 remote-จากเครื่องอื่น: defer (ผูกกับ D-001)
+
+F-Chat สร้างครบ Phase 1-3 (commits 98d83b3..c31ed7f) — security model ผ่าน Codex 4 รอบ; real query()
+streaming ยัง unverified (ต้อง claude binary + auth ก่อน exercise, เหมือน D-007)
