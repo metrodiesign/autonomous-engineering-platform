@@ -113,4 +113,18 @@ describe('makeChatSandbox config', () => {
   });
   it('wires a canUseTool broker', () => expect(typeof c.canUseTool).toBe('function'));
   it('READ_ALLOWLIST is Read-only', () => expect([...READ_ALLOWLIST]).toEqual(['Read']));
+  it('has no resume/forkSession by default', () => {
+    expect(c.resume).toBeUndefined();
+    expect(c.forkSession).toBeUndefined();
+  });
+  it('a resume id forks to a new session (never mutates the original transcript, INV-11)', () => {
+    const r = makeChatSandbox('/tmp/session', '0199aa11-2233-4455-6677-8899aabbccdd');
+    expect(r.resume).toBe('0199aa11-2233-4455-6677-8899aabbccdd');
+    expect(r.forkSession).toBe(true);
+  });
+  it('a resumed session still keeps the Read-only tool policy', () => {
+    const r = makeChatSandbox('/tmp/session', '0199aa11-2233-4455-6677-8899aabbccdd');
+    expect(r.tools).toEqual(['Read']);
+    expect(r.permissionMode).toBe('default');
+  });
 });

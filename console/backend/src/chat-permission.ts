@@ -99,10 +99,18 @@ export interface SandboxedQueryConfig {
   mcpServers: Record<string, never>;
   permissionMode: PermissionMode;
   canUseTool: CanUseTool;
+  /** Prior session id to resume. Always paired with forkSession:true (fork-only) — see makeChatSandbox. */
+  resume?: string;
+  forkSession?: boolean;
 }
 
-/** Assemble the fail-closed sandbox config for a chat session rooted at `cwd`. */
-export function makeChatSandbox(cwd: string): SandboxedQueryConfig {
+/**
+ * Assemble the fail-closed sandbox config for a chat session rooted at `cwd`.
+ * When `resume` is given the session resumes that prior transcript but ALWAYS forks (forkSession:true)
+ * to a new id — it never mutates the original on-disk transcript (INV-11). The Read-only tool policy
+ * still governs every turn of the resumed/forked session, whatever tools the original session had.
+ */
+export function makeChatSandbox(cwd: string, resume?: string): SandboxedQueryConfig {
   return {
     cwd,
     tools: ['Read'],
@@ -111,5 +119,6 @@ export function makeChatSandbox(cwd: string): SandboxedQueryConfig {
     mcpServers: {}, // no MCP tools
     permissionMode: 'default', // so canUseTool is consulted
     canUseTool: makeChatPermission([cwd]),
+    ...(resume ? { resume, forkSession: true } : {}),
   };
 }

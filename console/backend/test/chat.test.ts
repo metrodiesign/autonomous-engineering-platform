@@ -21,6 +21,22 @@ function fakeQueryFn(opts: { onClose?: () => void } = {}): ChatQueryFn {
   };
 }
 
+// Fake engine that records the args it was called with (used to assert resume threading).
+function capturingQueryFn(sink: { resume?: string; called: boolean }): ChatQueryFn {
+  return ({ input, resume, signal }) => {
+    sink.called = true;
+    sink.resume = resume;
+    let closed = false;
+    async function* gen(): AsyncGenerator<unknown> {
+      for await (const turn of input) {
+        if (closed || signal.aborted) return;
+        yield { type: 'assistant', message: { role: 'assistant', content: `echo: ${turn.content}` } };
+      }
+    }
+    return { messages: gen(), close: () => { closed = true; } };
+  };
+}
+
 const apps: FastifyInstance[] = [];
 const sockets: WebSocket[] = [];
 afterEach(async () => {
@@ -45,6 +61,11 @@ async function makeChatApp(opts: { queryFn?: ChatQueryFn; utilization?: () => Pr
 const base = (port: number) => `http://127.0.0.1:${port}`;
 async function newChat(port: number): Promise<{ status: number; id?: string }> {
   const r = await fetch(`${base(port)}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cwd: '/tmp' }) });
+  if (r.status !== 200) return { status: r.status };
+  return { status: 200, id: (await r.json() as { id: string }).id };
+}
+async function postChat(port: number, body: Record<string, unknown>): Promise<{ status: number; id?: string }> {
+  const r = await fetch(`${base(port)}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   if (r.status !== 200) return { status: r.status };
   return { status: 200, id: (await r.json() as { id: string }).id };
 }
@@ -146,5 +167,32 @@ describe('F-Chat backend (Phase 3a)', () => {
     const html = await r.text();
     expect(html).toContain('F-Chat');
     expect(html).toContain('/ws/chat');
+  });
+
+  it('threads a valid resume id to the query engine on attach', async () => {
+    const sink: { resume?: string; called: boolean } = { called: false };
+    const { port } = await makeChatApp({ queryFn: capturingQueryFn(sink) });
+    const uuid = '0199aa11-2233-4455-6677-8899aabbccdd';
+    const c = await postChat(port, { cwd: '/tmp', resume: uuid });
+    expect(c.status).toBe(200);
+    await openChat(port, await ticket(port, c.id!)); // attach triggers queryFn
+    await new Promise((r) => setTimeout(r, 20));
+    expect(sink.called).toBe(true);
+    expect(sink.resume).toBe(uuid);
+  });
+
+  it('passes resume=undefined when none is given', async () => {
+    const sink: { resume?: string; called: boolean } = { called: false };
+    const { port } = await makeChatApp({ queryFn: capturingQueryFn(sink) });
+    const c = await postChat(port, { cwd: '/tmp' });
+    await openChat(port, await ticket(port, c.id!));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(sink.called).toBe(true);
+    expect(sink.resume).toBeUndefined();
+  });
+
+  it('rejects a malformed resume id (400)', async () => {
+    const { port } = await makeChatApp();
+    expect((await postChat(port, { cwd: '/tmp', resume: 'not-a-uuid' })).status).toBe(400);
   });
 });

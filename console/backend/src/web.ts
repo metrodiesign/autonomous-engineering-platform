@@ -449,6 +449,7 @@ pages.sessions = async (root) => {
     '<td class="muted" title="' + new Date(s.lastModified).toLocaleString() + '">' + ago(s.lastModified) + '</td>' +
     '<td style="white-space:nowrap">' +
     '<button class="ghost" data-act="resume">resume</button>' +
+    '<button class="ghost" data-act="chat">chat</button>' +
     '<button class="ghost" data-act="rename">rename</button><button class="ghost" data-act="tag">tag</button>' +
     '<button class="ghost" data-act="fork">fork</button><button class="ghost" data-act="export">export</button>' +
     '<button class="ghost danger" data-act="del">delete</button>' +
@@ -502,6 +503,7 @@ pages.sessions = async (root) => {
     const id = tr.dataset.id, cwd = tr.dataset.cwd;
     const acts = {
       resume: () => window.open('/terminal?project=' + encodeURIComponent(cwd || getProject() || '') + '&resume=' + id, '_blank'),
+      chat: () => window.open('/chat?project=' + encodeURIComponent(cwd || getProject() || '') + '&resume=' + id, '_blank'),
       rename: async () => { const t = await promptDialog('Rename session', 'New display title', ''); if (t) { await api('/api/sessions/' + id + '/rename', { method: 'POST', body: { title: t } }); route(); } },
       tag: async () => { const t = await promptDialog('Tag session', 'Empty clears the tag', ''); if (t !== null) { await api('/api/sessions/' + id + '/tag', { method: 'POST', body: { tag: t || null } }); route(); } },
       fork: async () => { const r = await api('/api/sessions/' + id + '/fork', { method: 'POST', body: {} }); toast('Forked → ' + r.sessionId, 'green'); route(); },

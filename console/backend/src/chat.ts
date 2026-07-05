@@ -1,8 +1,9 @@
 // F-Chat Phase 3a — backend: sandboxed SDK query() chat sessions over the shared WS dispatcher.
 //
-// The query() engine is INJECTABLE (deps.queryFn). The default wraps the real SDK and is marked
-// unverified — it needs the `claude` binary + auth to exercise, like the D-007 adapters — so every tested
-// path injects a fake. Security posture is Phase 1's makeChatSandbox (Read-only, fail-closed broker).
+// The query() engine is INJECTABLE (deps.queryFn). The default wraps the real SDK. It was verified live
+// against the real claude binary on 2026-07-05 via scripts/chat-smoke.mjs (system -> assistant -> result,
+// sandboxed Read); CI still injects a fake (deterministic, no network). Security posture is Phase 1's
+// makeChatSandbox (Read-only, fail-closed broker).
 // Outbound is redacted per message (INV-14). A closed WS aborts the session (terminates the subprocess).
 import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
@@ -21,7 +22,7 @@ export interface ChatSessionQuery {
   close(): void;
 }
 
-export type ChatQueryFn = (args: { input: AsyncIterable<ChatUserTurn>; cwd: string; signal: AbortSignal }) => ChatSessionQuery;
+export type ChatQueryFn = (args: { input: AsyncIterable<ChatUserTurn>; cwd: string; resume?: string; signal: AbortSignal }) => ChatSessionQuery;
 
 /** A pushable async iterable of user turns fed into query()'s streaming input. */
 interface InputQueue extends AsyncIterable<ChatUserTurn> {
@@ -54,10 +55,9 @@ function makeInputQueue(): InputQueue {
 }
 
 // Default engine: the real SDK query(), sandboxed by makeChatSandbox.
-// ponytail: unverified against the real claude binary (needs auth) — the tested path injects a fake.
-// Real run gated like D-007.
-const sdkQueryFn: ChatQueryFn = ({ input, cwd, signal }) => {
-  const sandbox = makeChatSandbox(cwd);
+// Verified live via scripts/chat-smoke.mjs (2026-07-05, claude 2.1.201, OAuth); CI injects a fake.
+export const sdkQueryFn: ChatQueryFn = ({ input, cwd, resume, signal }) => {
+  const sandbox = makeChatSandbox(cwd, resume);
   async function* prompt(): AsyncGenerator<SDKUserMessage> {
     for await (const turn of input) {
       yield { type: 'user', message: { role: 'user', content: turn.content }, parent_tool_use_id: null };
@@ -71,6 +71,7 @@ const sdkQueryFn: ChatQueryFn = ({ input, cwd, signal }) => {
 interface ChatSession {
   id: string;
   cwd: string;
+  resume?: string;
   controller: AbortController;
   input: InputQueue;
   attached: boolean;
@@ -109,9 +110,13 @@ export function registerChat(app: FastifyInstance, wsd: WsDispatcher, deps: Chat
     deps.audit({ type: 'CHAT_CLOSE', chatId: id, reason, ts: now() });
   }
 
-  app.post<{ Body: { cwd?: string } }>('/api/chat', async (req, reply) => {
+  app.post<{ Body: { cwd?: string; resume?: string } }>('/api/chat', async (req, reply) => {
     const cwd = req.body?.cwd;
     if (!cwd) return reply.code(400).send({ error: 'cwd required' });
+    const resume = req.body?.resume;
+    if (resume !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resume)) {
+      return reply.code(400).send({ error: 'resume must be a session UUID' });
+    }
     const t = now();
     spawnTimes = spawnTimes.filter((x) => t - x < 10_000);
     if (spawnTimes.length >= 5) return reply.code(429).send({ error: 'chat spawn rate limit (5/10s)' });
@@ -122,16 +127,16 @@ export function registerChat(app: FastifyInstance, wsd: WsDispatcher, deps: Chat
     }
     spawnTimes.push(t);
     const id = `chat-${randomBytes(5).toString('hex')}`;
-    sessions.set(id, { id, cwd, controller: new AbortController(), input: makeInputQueue(), attached: false, createdAt: t });
-    deps.audit({ type: 'CHAT_SPAWN', chatId: id, cwd, ts: t });
+    sessions.set(id, { id, cwd, controller: new AbortController(), input: makeInputQueue(), attached: false, createdAt: t, ...(resume ? { resume } : {}) });
+    deps.audit({ type: 'CHAT_SPAWN', chatId: id, cwd, resume, ts: t });
     return { id };
   });
 
   app.get('/api/chat', async () => ({ chats: [...sessions.values()].map((s) => ({ id: s.id, cwd: s.cwd, attached: s.attached, createdAt: s.createdAt })) }));
 
   // Standalone chat page (like /terminal): owns its own WS lifecycle in a dedicated tab.
-  app.get<{ Querystring: { project?: string } }>('/chat', async (req, reply) => {
-    reply.type('text/html').send(CHAT_HTML(safeJsonForScript({ project: req.query.project ?? process.cwd() })));
+  app.get<{ Querystring: { project?: string; resume?: string } }>('/chat', async (req, reply) => {
+    reply.type('text/html').send(CHAT_HTML(safeJsonForScript({ project: req.query.project ?? process.cwd(), resume: req.query.resume ?? null })));
   });
 
   app.post<{ Params: { id: string } }>('/api/chat/:id/ticket', async (req, reply) => {
@@ -169,7 +174,7 @@ export function registerChat(app: FastifyInstance, wsd: WsDispatcher, deps: Chat
     }
     session.attached = true;
     upgrade((ws) => {
-      const q = queryFn({ input: session.input, cwd: session.cwd, signal: session.controller.signal });
+      const q = queryFn({ input: session.input, cwd: session.cwd, signal: session.controller.signal, ...(session.resume ? { resume: session.resume } : {}) });
       session.query = q;
       ws.on('message', (m) => {
         try {
@@ -246,6 +251,7 @@ const CHAT_HTML = (bootJson: string): string => /* html */ `<!doctype html>
   const statusEl = document.getElementById('status');
   const sendBtn = document.getElementById('send');
   const msg = document.getElementById('msg');
+  if (BOOT.resume) document.getElementById('bar').insertAdjacentText('beforeend', ' · resuming ' + String(BOOT.resume).slice(0, 8));
   function bubble(cls) { const d = document.createElement('div'); d.className = 'msg ' + cls; log.appendChild(d); return d; }
   function addText(cls, text) { const d = bubble(cls); d.textContent = text; log.scrollTop = log.scrollHeight; return d; }
   function renderAssistant(message) {
@@ -267,7 +273,9 @@ const CHAT_HTML = (bootJson: string): string => /* html */ `<!doctype html>
   let ws = null;
   (async () => {
     try {
-      const created = await (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cwd: BOOT.project }) })).json();
+      const body = { cwd: BOOT.project };
+      if (BOOT.resume) body.resume = BOOT.resume;
+      const created = await (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
       if (!created.id) { statusEl.textContent = '· ' + (created.error || 'could not start'); return; }
       const t = await (await fetch('/api/chat/' + created.id + '/ticket', { method: 'POST' })).json();
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';

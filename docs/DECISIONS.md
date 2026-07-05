@@ -74,4 +74,5 @@ curl ผ่าน LAN IP บนเครื่องเดียวกัน · 
 - D-008 remote-จากเครื่องอื่น: defer (ผูกกับ D-001)
 
 F-Chat สร้างครบ Phase 1-3 (commits 98d83b3..c31ed7f) — security model ผ่าน Codex 4 รอบ; real query()
-streaming ยัง unverified (ต้อง claude binary + auth ก่อน exercise, เหมือน D-007)
+streaming verified live 2026-07-05 via scripts/chat-smoke.mjs (claude 2.1.201, OAuth: system -> assistant
+-> result + sandboxed Read); CI ยัง inject fake (deterministic, ไม่มี network)
