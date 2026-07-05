@@ -12,6 +12,7 @@ function makeApp(dir: string) {
     getSessionMessages: (async () => []) as never,
     cliVersion: async () => 'test',
     auditFile: join(dir, 'audit.jsonl'),
+    searchDbPath: join(dir, 'search.db'),
   });
 }
 
@@ -84,6 +85,7 @@ describe('phase 2 extensions', () => {
       getSessionMessages: (async () => []) as never,
       cliVersion: async () => 'test',
       auditFile: join(dir, 'audit.jsonl'),
+    searchDbPath: join(dir, 'search.db'),
     });
     const r = (await app.inject({ url: '/api/guards/automation' })).json();
     expect(r.allowed).toBe(false);

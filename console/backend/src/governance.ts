@@ -76,6 +76,17 @@ export function registerGovernance(app: FastifyInstance, audit: (e: Record<strin
   });
 
   // ---- F-Perm ----
+  app.get<{ Params: { scope: Scope }; Querystring: { dir?: string } }>(
+    '/api/permissions/:scope',
+    async (req, reply) => {
+      const { scope } = req.params;
+      if (!['user', 'project', 'local'].includes(scope)) return reply.code(400).send({ error: 'scope must be user|project|local' });
+      const p = settingsPath(scope, req.query.dir ?? process.cwd());
+      const perms = existsSync(p) ? ((JSON.parse(readFileSync(p, 'utf8')).permissions ?? {}) as Record<string, string[]>) : {};
+      return { scope, hash: fileHash(p), allow: perms.allow ?? [], deny: perms.deny ?? [], ask: perms.ask ?? [] };
+    },
+  );
+
   app.put<{ Params: { scope: Scope }; Querystring: { dir?: string }; Body: { allow?: string[]; deny?: string[]; ask?: string[]; expectedHash?: string } }>(
     '/api/permissions/:scope',
     async (req, reply) => {

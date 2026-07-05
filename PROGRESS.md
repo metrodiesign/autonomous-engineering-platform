@@ -101,6 +101,18 @@ hard gates ทุกตัวผ่าน · invariants ไม่มีข้อ
 4. credentials ของ vendor อื่นถ้าต้องการ quota-survivability จริง (D-007) → รัน conformance ก่อนใช้
 5. review PR จาก branch build/platform (กฎ: ห้าม merge โดยไม่มี review)
 
+## Checkpoint 2026-07-05 — Console SPA เต็มตาม §8
+
+ผู้ใช้ชี้ว่าหน้า Console ยังเป็น Phase-0 landing → สร้าง SPA เดียวครบทุก F-page ตามตาราง §8:
+F-Status/F-Proj(register+loop-managed banner)/F-Sess(rename/tag/fork/export/delete + FTS5 search)/
+F-Term(launcher+attach/kill)/F-Set(scope picker+effective view+apply-timing)/F-Perm(builder+merged+
+simulator+protect-golden)/F-Auth/F-Mem/F-MCP/F-Hook(read view+consent builder)/F-Sub/F-Skill/
+F-Usage(HUD+breakdown วัน/โปรเจกต์/โมเดล+alerts)/F-Act(SSE feed+one-click hooks fail-open)/
+F-Loop(Approve/Reject/Steer/Kill)/F-Sched/F-Sys(retention write) · deep-link ?project= ทุกหน้า ·
+background ops = action + poll /api/actions/{id}/status · Human Plane เพิ่ม POST /steer ·
+พิสูจน์สด: ทุกหน้า render บน browser จริง, index 716 sessions/6s, search + per-model breakdown
+คืนข้อมูลจริง · CI เขียว (85 tests) · F-Chat ยังตัดตาม §16 (optional non-parity, รอมนุษย์ยืนยัน)
+
 ## Session log
 
 - 2026-07-04 — session 1: อ่านสเปกจบ · branch `build/platform` · ไฟล์ควบคุม + Build Plan · เริ่ม spikes

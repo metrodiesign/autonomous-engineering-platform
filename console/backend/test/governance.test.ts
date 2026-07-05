@@ -12,6 +12,7 @@ function makeApp(dir: string) {
     getSessionMessages: (async () => []) as never,
     cliVersion: async () => 'test',
     auditFile: join(dir, 'audit.jsonl'),
+    searchDbPath: join(dir, 'search.db'),
   });
 }
 

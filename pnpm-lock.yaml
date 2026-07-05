@@ -53,6 +53,9 @@ importers:
       '@xterm/xterm':
         specifier: 6.0.0
         version: 6.0.0
+      better-sqlite3:
+        specifier: 12.11.1
+        version: 12.11.1
       fastify:
         specifier: 5.9.0
         version: 5.9.0
@@ -63,6 +66,9 @@ importers:
         specifier: 8.19.0
         version: 8.19.0
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: 7.6.13
+        version: 7.6.13
       '@types/ws':
         specifier: 8.18.1
         version: 8.18.1

@@ -46,6 +46,7 @@ describe('auth-gated console (§13.1/§13.3)', () => {
       getSessionMessages: (async () => []) as never,
       cliVersion: async () => 'test',
       auditFile: join(dir, 'audit.jsonl'),
+    searchDbPath: join(dir, 'search.db'),
     });
     expect((await app.inject({ url: '/api/status' })).statusCode).toBe(401);
     expect((await app.inject({ url: '/terminal' })).statusCode).toBe(401); // F-Term always auth (INV-17)
@@ -87,6 +88,7 @@ describe('F-Loop proxies the Human Plane API (INV-11)', () => {
       getSessionMessages: (async () => []) as never,
       cliVersion: async () => 'test',
       auditFile: join(dir, 'audit.jsonl'),
+    searchDbPath: join(dir, 'search.db'),
     });
     const list = await app.inject({ url: '/api/loop/approvals' });
     expect(list.json().approvals).toHaveLength(1);

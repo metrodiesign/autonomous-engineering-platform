@@ -84,6 +84,8 @@ export interface HumanPlaneDeps {
   log: EventLog;
   approvals: ApprovalStore;
   onKill?: () => void;
+  /** steering hook (§10.3): inject human guidance into a running task as marked data */
+  onSteer?: (taskId: string, guidance: string) => { accepted: boolean; reason?: string };
   tokenFile: string;
 }
 
@@ -126,6 +128,26 @@ export function startHumanPlane(deps: HumanPlaneDeps, port: number): Promise<{ s
     if (req.method === 'GET' && url.pathname === '/events') {
       const since = Number(url.searchParams.get('since') ?? 0);
       return send(200, { events: deps.log.all().filter((e) => (e.seq ?? 0) > since) });
+    }
+    if (req.method === 'POST' && url.pathname === '/steer') {
+      let body = '';
+      req.on('data', (c: Buffer) => { body += c.toString(); });
+      req.on('end', () => {
+        try {
+          const { taskId, guidance } = JSON.parse(body || '{}') as { taskId?: string; guidance?: string };
+          if (!taskId || !guidance) return send(400, { error: 'taskId + guidance required' });
+          if (!deps.onSteer) return send(501, { error: 'steering not wired' });
+          const r = deps.onSteer(taskId, guidance);
+          deps.log.append({
+            ts: Date.now(), taskId, type: r.accepted ? 'STEER_ACCEPTED' : 'STEER_REFUSED',
+            principal: 'human', payload: { chars: guidance.length, ...(r.reason ? { reason: r.reason } : {}) },
+          });
+          return send(r.accepted ? 200 : 409, r);
+        } catch {
+          return send(400, { error: 'bad json' });
+        }
+      });
+      return;
     }
     if (req.method === 'POST' && url.pathname === '/kill') {
       deps.log.append({ ts: Date.now(), taskId: '*', type: 'KILL_SWITCH', principal: 'human', payload: {} });

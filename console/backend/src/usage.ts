@@ -15,6 +15,53 @@ export interface UsageEstimate {
   week: { sessions: number; bytes: number };
 }
 
+export interface UsageBreakdown {
+  label: string;
+  byDay: { day: string; sessions: number }[];
+  byProject: { projectKey: string; sessions: number }[];
+  byModel: { model: string; sessions: number }[];
+}
+
+export interface AggregateInput {
+  projectKey: string;
+  day: string;
+  models: string[];
+}
+
+/** F-Usage Phase 2 (§8): day/project/model breakdown from indexed transcript metadata. */
+export function usageBreakdown(aggregates: AggregateInput[]): UsageBreakdown {
+  const count = <K extends string>(keys: K[]): Map<K, number> => {
+    const m = new Map<K, number>();
+    for (const k of keys) m.set(k, (m.get(k) ?? 0) + 1);
+    return m;
+  };
+  const top = <T>(m: Map<string, number>, mk: (k: string, n: number) => T, limit: number): T[] =>
+    [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([k, n]) => mk(k, n));
+  return {
+    label: 'estimate from local transcripts — not official numbers',
+    byDay: [...count(aggregates.map((a) => a.day)).entries()].sort().map(([day, sessions]) => ({ day, sessions })),
+    byProject: top(count(aggregates.map((a) => a.projectKey)), (projectKey, sessions) => ({ projectKey, sessions }), 10),
+    byModel: top(count(aggregates.flatMap((a) => a.models)), (model, sessions) => ({ model, sessions }), 10),
+  };
+}
+
+export interface UsageAlert {
+  level: 'ok' | 'warn';
+  message: string;
+}
+
+/** Alerts (§8): threshold on window utilization; label interactive vs non-interactive explicitly. */
+export function evaluateAlerts(utilization: number, threshold: number): UsageAlert[] {
+  const pct = Math.round(utilization * 100);
+  if (utilization >= threshold) {
+    return [
+      { level: 'warn', message: `estimated window utilization ${pct}% >= threshold ${Math.round(threshold * 100)}% — non-interactive (scheduler/loop) work should yield` },
+      { level: 'warn', message: 'interactive sessions keep priority; official numbers: /usage in the CLI' },
+    ];
+  }
+  return [{ level: 'ok', message: `estimated window utilization ${pct}% < threshold ${Math.round(threshold * 100)}%` }];
+}
+
 export function estimateUsage(sessions: SessionStat[], now: number): UsageEstimate {
   const week = sessions.filter((s) => now - s.lastModified <= WEEK_MS);
   // rolling 5h window anchored at the first activity inside it (§5.3)

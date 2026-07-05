@@ -54,6 +54,26 @@ export function registerExtensions(
     },
   );
 
+  // ---- F-Hook: merged read view across scopes (TUI /hooks is read-only; Console is the editor) ----
+  app.get<{ Querystring: { dir?: string } }>('/api/hooks', async (req) => {
+    const dir = req.query.dir ?? process.cwd();
+    const readHooks = (p: string): Record<string, unknown> => {
+      if (!existsSync(p)) return {};
+      try {
+        const s = JSON.parse(readFileSync(p, 'utf8'));
+        return { hooks: s.hooks ?? {}, disableAllHooks: s.disableAllHooks };
+      } catch { return { error: 'unreadable settings file' }; }
+    };
+    return {
+      events: [...HOOK_EVENTS],
+      scopes: {
+        user: readHooks(join(homedir(), '.claude', 'settings.json')),
+        project: readHooks(join(dir, '.claude', 'settings.json')),
+        local: readHooks(join(dir, '.claude', 'settings.local.json')),
+      },
+    };
+  });
+
   // ---- F-Hook: builder/validator with consent gate (INV-16) ----
   app.put<{
     Params: { scope: 'user' | 'project' | 'local' };
@@ -116,7 +136,7 @@ export function registerExtensions(
   app.get('/api/system', async () => {
     const doctor = await pExecFile('claude', ['doctor', '--json'], { timeout: 30_000 })
       .then((r) => r.stdout.slice(0, 4000))
-      .catch((e: Error) => `doctor unavailable: ${e.message.slice(0, 200)}`);
+      .catch(() => 'doctor is interactive-only in this CLI version — run /doctor inside a terminal session (F-Term)');
     const settingsPath = join(homedir(), '.claude', 'settings.json');
     const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
     return {
@@ -126,6 +146,25 @@ export function registerExtensions(
         cleanupPeriodDays: settings.cleanupPeriodDays ?? null,
         warning: 'ลด retention = ลบ transcript ซึ่งเป็นหลักฐาน/ข้อมูลอ่อนไหว — ตั้งใจก่อนแก้',
       },
+    };
+  });
+
+  // ---- F-Sys: retention write (§8) — explicit warning, atomic, audited ----
+  app.put<{ Body: { cleanupPeriodDays?: number | null } }>('/api/system/retention', async (req, reply) => {
+    const days = req.body?.cleanupPeriodDays;
+    if (days !== null && (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 3650)) {
+      return reply.code(400).send({ error: 'cleanupPeriodDays must be an integer 1..3650, or null to unset' });
+    }
+    const p = join(homedir(), '.claude', 'settings.json');
+    const cur = existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : {};
+    if (days === null) delete cur.cleanupPeriodDays;
+    else cur.cleanupPeriodDays = days;
+    atomicWrite(p, JSON.stringify(cur, null, 2) + '\n');
+    audit({ type: 'RETENTION_WRITE', cleanupPeriodDays: days, ts: Date.now() });
+    return {
+      ok: true,
+      cleanupPeriodDays: days,
+      warning: 'lowering retention deletes transcripts (evidence + possibly sensitive data); applies on next CLI cleanup pass',
     };
   });
 

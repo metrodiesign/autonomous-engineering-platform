@@ -41,3 +41,15 @@ out/
 .vscode/
 .idea/
 .DS_Store
+
+# Platform runtime artifacts (not evidence — regenerated per run)
+.ai/audit/
+**/.ai/audit/
+.ai/console/
+**/.ai/console/
+.ai/runs/
+.ai/human-plane.token
+**/.ai/human-plane.token
+
+# Playwright MCP artifacts
+.playwright-mcp/

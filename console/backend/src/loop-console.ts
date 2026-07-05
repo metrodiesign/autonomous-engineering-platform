@@ -41,6 +41,14 @@ export function registerLoopConsole(app: FastifyInstance, deps: LoopConsoleDeps)
     return reply.code(status).send(body);
   });
 
+  app.post<{ Body: { taskId?: string; guidance?: string } }>('/api/loop/steer', async (req, reply) => {
+    const { taskId, guidance } = req.body ?? {};
+    if (!taskId || !guidance) return reply.code(400).send({ error: 'taskId + guidance required' });
+    const { status, body } = await proxy('/steer', { method: 'POST', body: JSON.stringify({ taskId, guidance }) });
+    deps.audit({ type: 'LOOP_STEER', taskId, ts: Date.now() });
+    return reply.code(status).send(body);
+  });
+
   app.post('/api/loop/kill', async (_req, reply) => {
     const { status, body } = await proxy('/kill', { method: 'POST', body: '{}' });
     deps.audit({ type: 'LOOP_KILL', ts: Date.now() });
