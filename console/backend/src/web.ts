@@ -68,6 +68,15 @@ export const INDEX_HTML: string = /* html */ `<!doctype html>
     #content { padding:16px 14px 60px; }
     .card { overflow-x:auto; }
   }
+  @media (max-width: 560px) {
+    #topbar { gap:8px 10px; }
+    #projsel { max-width:100%; flex:1 1 100%; }
+    #content { padding:14px 12px 48px; }
+    .grid2 { grid-template-columns:1fr; }
+    .card { padding:14px; }
+    table { font-size:12px; }
+    .row { flex-wrap:wrap; }
+  }
 
   /* ---- components ---- */
   .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
