@@ -113,6 +113,19 @@ background ops = action + poll /api/actions/{id}/status · Human Plane เพิ
 พิสูจน์สด: ทุกหน้า render บน browser จริง, index 716 sessions/6s, search + per-model breakdown
 คืนข้อมูลจริง · CI เขียว (85 tests) · F-Chat ยังตัดตาม §16 (optional non-parity, รอมนุษย์ยืนยัน)
 
+## Checkpoint 2026-07-05 (2) — UX/UI modernization + adversarial review
+
+Redesign SPA: design tokens (light/dark), sidebar + sticky topbar + SVG icons, KPI cards, bar
+charts ใน Usage, modal dialogs แทน prompt/confirm (role=dialog + focus trap + Escape + restore),
+skeleton loading, relative timestamps, empty states, responsive drawer (mobile) ·
+ultracode review panel (24 agents, 3 lens): confirmed 19 defects → แก้ครบ: stored XSS
+(cleanupPeriodDays attr — esc+Number ทั้ง UI และ backend type-guard), navigation-generation
+token กัน stale continuation เขียนข้าม page (Settings JSON เคยหลุดลง CLAUDE.md editor ได้),
+double-route จาก project link, 401 poller เคยลบ password ที่พิมพ์อยู่, confirm dialog ให้
+sched stop / hooks uninstall / terminal kill (ผ่าน api()), aria-live toasts, focus-visible,
+aria-label ทุก input, touch target >=30px, mobile topbar wrap + card overflow ·
+พิสูจน์สด: 17 หน้า render + modal Escape/focus + race test + single-route ผ่านหมด · CI เขียว 85
+
 ## Session log
 
 - 2026-07-04 — session 1: อ่านสเปกจบ · branch `build/platform` · ไฟล์ควบคุม + Build Plan · เริ่ม spikes

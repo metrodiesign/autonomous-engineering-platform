@@ -143,7 +143,8 @@ export function registerExtensions(
       doctor,
       host: { loadavg: loadavg(), freemem: freemem(), totalmem: totalmem() },
       retention: {
-        cleanupPeriodDays: settings.cleanupPeriodDays ?? null,
+        // type-guard: settings.json is attacker-editable; never let a string reach the UI
+        cleanupPeriodDays: typeof settings.cleanupPeriodDays === 'number' ? settings.cleanupPeriodDays : null,
         warning: 'ลด retention = ลบ transcript ซึ่งเป็นหลักฐาน/ข้อมูลอ่อนไหว — ตั้งใจก่อนแก้',
       },
     };
