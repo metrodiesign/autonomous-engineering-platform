@@ -13,6 +13,7 @@ import { INDEX_HTML } from './web.js';
 import { PtyManager } from './pty-manager.js';
 import { registerTerminal } from './terminal.js';
 import { createWsDispatcher } from './ws-dispatcher.js';
+import { registerChat, type ChatQueryFn } from './chat.js';
 import { registerGovernance } from './governance.js';
 import { registerExtensions } from './extensions.js';
 import { registerLoopConsole } from './loop-console.js';
@@ -38,6 +39,7 @@ export interface ServerDeps {
   calibrationFile?: string;
   publicPort?: number;
   sessionOps?: Partial<import('./sessions-ops.js').SessionOpsDeps>;
+  chatQueryFn?: ChatQueryFn;
 }
 
 const DISCLAIMER = 'Third-party operator console for Claude Code — not an Anthropic product.';
@@ -123,8 +125,8 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
   if (!provider) {
     app.addHook('onRequest', async (req, reply) => {
       const path = req.url.split('?')[0] ?? '';
-      const isTerm = path === '/terminal' || path === '/api/term' || path.startsWith('/api/term/');
-      if (!isTerm) return;
+      const guarded = path === '/terminal' || path.startsWith('/api/term') || path.startsWith('/api/chat');
+      if (!guarded) return;
       const peer = req.socket?.remoteAddress ?? '';
       if (peer && !LOOPBACK_PEERS.has(peer)) {
         return reply.code(401).send({ error: 'F-Term requires auth for remote peers (INV-17)' });
@@ -150,6 +152,12 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
     return Math.min(1, est.currentWindow.sessions / quotaWindowBudget);
   };
   registerExtensions(app, audit, { utilization });
+  registerChat(app, wsd, {
+    audit,
+    peerAllowed: termPeerAllowed,
+    utilization,
+    ...(deps.chatQueryFn ? { queryFn: deps.chatQueryFn } : {}),
+  });
   const humanPlaneUrl = env.PLATFORM_HUMAN_PLANE_URL ?? 'http://127.0.0.1:9210';
   const tokenFile = env.PLATFORM_HUMAN_PLANE_TOKEN_FILE ?? '.ai/human-plane.token';
   registerLoopConsole(app, {
